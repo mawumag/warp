@@ -102,3 +102,7 @@ workflows:
   - name: BuildIndices
     subclass: WDL
     primaryDescriptorPath: /pipelines/skylab/build_indices/BuildIndices.wdl
+
+  - name: VariantCalling
+    subclass: WDL
+    primaryDescriptorPath: /pipelines/broad/dna_seq/germline/variant_calling/VariantCalling.wdl
