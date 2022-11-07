@@ -162,8 +162,8 @@ workflow UltimaGenomicsWholeGenomeGermline {
 
   # Outputs that will be retained when execution is complete
   output {
-    File output_vcf = PostProcessing.output_vcf
-    File output_vcf_index = PostProcessing.output_vcf_index
+    File output_vcf = PostProcessing.vcf_file
+    File output_vcf_index = PostProcessing.vcf_index
 
     File output_cram = UltimaGenomicsWholeGenomeCramOnly.output_cram
     File output_cram_index = UltimaGenomicsWholeGenomeCramOnly.output_cram_index
