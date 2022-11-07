@@ -30,6 +30,29 @@ workflow UltimaGenomicsWholeGenomeGermline {
     Boolean make_haplotype_bam = false
     Int reads_per_split = 20000000
     String filtering_model_no_gt_name = "rf_model_ignore_gt_incl_hpol_runs"
+
+    #Temp DV inputs
+    File? background_bam_file
+    File? background_bam_index_file
+    Float min_fraction_hmer_indels = 0.12
+    Float min_fraction_non_hmer_indels = 0.06
+    Float min_fraction_snps = 0.12
+    Int min_base_quality = 5
+    Int pileup_min_mapping_quality =5
+    Int candidate_min_mapping_quality = 5
+    Int dbg_min_base_quality = 0
+    Int min_windows_distance = 20
+    String alt_aligned_pileup = "none"
+    String? ug_channels_args = "--aux_fields_to_keep tp,t0 --skip_bq_channel --channels hmer_deletion_quality,hmer_insertion_quality,non_hmer_insertion_quality"
+    Int vsc_max_background_count = -1
+    Float max_background_fraction = -1
+    String dv_docker = "gcr.io/terra-project-249020/deepvariant:ug-1.4.4_8ebb16b5"
+    String gitc_docker = "us.gcr.io/broad-gotc-prod/genomes-in-the-cloud:2.4.6-1599252698"
+    String gitc_jar_path = "/usr/gitc/"
+    File model = "gs://jukebox-broad-data-share/deepvariant/model/germline/v1.1/model.ckpt-740000.data-00000-of-00001"
+    File model_index = "gs://jukebox-broad-data-share/deepvariant/model/germline/v1.1/model.ckpt-740000.index"
+    File model_meta = "gs://jukebox-broad-data-share/deepvariant/model/germline/v1.1/model.ckpt-740000.meta"
+    Int preemptible_tries = 1
   }
 
   meta {
@@ -52,6 +75,9 @@ workflow UltimaGenomicsWholeGenomeGermline {
 
   String pipeline_version = "1.0.5"
 
+  String make_examples_executable = (if defined(background_bam_file) then "multisample_make_examples" else "make_examples")
+  String output_prefix = base_file_name 
+  String monitoring_script="gs://broad-dsde-methods-monitoring/cromwell_monitoring_script.sh"
 
   References references = alignment_references.references
 
@@ -84,131 +110,60 @@ workflow UltimaGenomicsWholeGenomeGermline {
 
   # Call variants in parallel over WGS calling intervals
   scatter (index in range(ScatterIntervalList.interval_count)) {
-    # Generate VCF by interval
-    call Tasks.HaplotypeCaller as HaplotypeCaller {
+    call MakeInferenceExamples {
       input:
-        input_bam_list  = [select_first([UltimaGenomicsWholeGenomeCramOnly.output_bam])],
-        input_bam_index_list = [select_first([UltimaGenomicsWholeGenomeCramOnly.output_bam_index])],
-        interval_list   = ScatterIntervalList.out[index],
-        vcf_basename    = UltimaGenomicsWholeGenomeCramOnly.output_safe_name,
-        references      = references,
-        make_bamout     = make_haplotype_bam
+        interval = ScatterIntervalList.out[index],
+        total_number_of_shards = ScatterIntervalList.interval_count,
+        references = references,
+        bam_files = [select_first([UltimaGenomicsWholeGenomeCramOnly.output_bam])],
+        bam_index_files = [select_first([UltimaGenomicsWholeGenomeCramOnly.output_bam_index])],
+        background_bam_file = background_bam_file,
+        background_bam_index_file = background_bam_index_file,
+        alt_aligned_pileup = alt_aligned_pileup,
+        min_fraction_hmer_indels = min_fraction_hmer_indels,
+        min_fraction_non_hmer_indels = min_fraction_non_hmer_indels,
+        min_fraction_snps = min_fraction_snps,
+        min_base_quality = min_base_quality,
+        candidate_min_mapping_quality = candidate_min_mapping_quality,
+        pileup_min_mapping_quality = pileup_min_mapping_quality,
+        dbg_min_base_quality = dbg_min_base_quality,
+        min_windows_distance = min_windows_distance,
+        vsc_max_background_count = vsc_max_background_count,
+        vsc_max_background_fraction = vsc_max_background_count,
+        ug_channels_args = ug_channels_args,
+        dv_docker = dv_docker,
+        make_examples_executable = make_examples_executable,
+        monitoring_script = monitoring_script,
+        preemptible_tries = preemptible_tries
     }
   }
 
-  # Combine by-interval VCFs into a single sample  file
-  call VariantDiscoverTasks.MergeVCFs {
+  call CallVariants {
     input:
-      input_vcfs          = HaplotypeCaller.output_vcf,
-      input_vcfs_indexes  = HaplotypeCaller.output_vcf_index,
-      output_vcf_name     = UltimaGenomicsWholeGenomeCramOnly.output_safe_name + ".g.vcf.gz",
+      examples = MakeInferenceExamples.output_examples,
+      model = model,
+      model_index = model_index,
+      model_meta = model_meta,
+      dv_docker = dv_docker,
+      call_variants_exec = "call_variants",
+      total_number_of_shards = ScatterIntervalList.interval_count,
+      monitoring_script = monitoring_script
   }
-
-  # Combine by-interval BAMs into a single sample file
-  if(merge_bam_file && make_haplotype_bam) {
-      call Tasks.MergeBams {
-        input:
-          input_bams      = HaplotypeCaller.bamout,
-          output_bam_name = UltimaGenomicsWholeGenomeCramOnly.output_safe_name + ".bam",
-      }
-  }
-
-  call Tasks.ConvertGVCFtoVCF {
+  call PostProcessing {
     input:
-      input_gvcf         = MergeVCFs.output_vcf,
-      input_gvcf_index   = MergeVCFs.output_vcf_index,
-      output_vcf_name    = UltimaGenomicsWholeGenomeCramOnly.output_safe_name + '.vcf.gz',
-      references         = references
+      called_records = CallVariants.output_records,
+      ref = references.ref_fasta,
+      ref_index = references.ref_fasta_index,
+      dv_docker = dv_docker,
+      output_prefix = output_prefix,
+      monitoring_script = monitoring_script
   }
-
-  # VCF post-processings
-  call Tasks.AnnotateVCF {
-    input :
-      input_vcf               = ConvertGVCFtoVCF.output_vcf,
-      input_vcf_index         = ConvertGVCFtoVCF.output_vcf_index,
-      references              = references,
-      reference_dbsnp         = vcf_post_processing.ref_dbsnp,
-      reference_dbsnp_index   = vcf_post_processing.ref_dbsnp_index,
-      flow_order              = UltimaGenomicsWholeGenomeCramOnly.flow_order,
-      final_vcf_base_name     = UltimaGenomicsWholeGenomeCramOnly.output_safe_name
-  }
-
-  call Tasks.AddIntervalAnnotationsToVCF {
-    input:
-      input_vcf             = AnnotateVCF.output_vcf_annotated,
-      input_vcf_index       = AnnotateVCF.output_vcf_annotated_index,
-      final_vcf_base_name   = UltimaGenomicsWholeGenomeCramOnly.output_safe_name,
-      annotation_intervals  = vcf_post_processing.annotation_intervals
-  }
-
-  call Tasks.TrainModel {
-    input:
-      input_file                = AddIntervalAnnotationsToVCF.output_vcf,
-      input_file_index          = AddIntervalAnnotationsToVCF.output_vcf_index,
-      input_vcf_name            = UltimaGenomicsWholeGenomeCramOnly.output_safe_name,
-      blocklist_file            = vcf_post_processing.training_blocklist_file,
-      ref_fasta                 = references.ref_fasta,
-      ref_index                 = references.ref_fasta_index,
-      runs_file                 = vcf_post_processing.runs_file,
-      apply_model               = filtering_model_no_gt_name,
-      annotation_intervals      = vcf_post_processing.annotation_intervals,
-      exome_weight              = vcf_post_processing.exome_weight,
-      exome_weight_annotation   = vcf_post_processing.exome_weight_annotation
-  }
-
-
-  call Tasks.AnnotateVCF_AF {
-    input :
-      input_vcf             = AddIntervalAnnotationsToVCF.output_vcf,
-      input_vcf_index       = AddIntervalAnnotationsToVCF.output_vcf_index,
-      af_only_gnomad        = vcf_post_processing.af_only_gnomad,
-      af_only_gnomad_index  = vcf_post_processing.af_only_gnomad_index,
-      final_vcf_base_name   = UltimaGenomicsWholeGenomeCramOnly.output_safe_name
-  }
-
-  call Tasks.FilterVCF {
-    input:
-      input_vcf               = AnnotateVCF_AF.output_vcf_annotated,
-      input_model             = select_first([vcf_post_processing.filtering_model_no_gt,TrainModel.model_pkl]),
-      runs_file               = vcf_post_processing.runs_file,
-      references              = references,
-      model_name              = filtering_model_no_gt_name,
-      filter_cg_insertions    = vcf_post_processing.filter_cg_insertions,
-      final_vcf_base_name     = UltimaGenomicsWholeGenomeCramOnly.output_safe_name,
-      flow_order              = UltimaGenomicsWholeGenomeCramOnly.flow_order,
-      annotation_intervals    = vcf_post_processing.annotation_intervals
-  }
-
-  call Tasks.MoveAnnotationsToGvcf {
-    input:
-      filtered_vcf        = FilterVCF.output_vcf_filtered,
-      filtered_vcf_index  = FilterVCF.output_vcf_filtered_index,
-      gvcf                = MergeVCFs.output_vcf,
-      gvcf_index          = MergeVCFs.output_vcf_index
-  }
-
-  call ReblockGVCF.ReblockGVCF {
-    input:
-      gvcf = MoveAnnotationsToGvcf.output_gvcf,
-      gvcf_index = MoveAnnotationsToGvcf.output_gvcf_index,
-      calling_interval_list = variant_calling_settings.wgs_calling_interval_list,
-      ref_dict = alignment_references.references.ref_dict,
-      ref_fasta = alignment_references.references.ref_fasta,
-      ref_fasta_index = alignment_references.references.ref_fasta_index,
-      tree_score_cutoff = vcf_post_processing.remove_low_tree_score_sites_cutoff,
-      annotations_to_keep_command = vcf_post_processing.annotations_to_keep_command_for_reblocking
-  }
+  
 
   # Outputs that will be retained when execution is complete
   output {
-    File output_gvcf = ReblockGVCF.output_vcf
-    File output_gvcf_index = ReblockGVCF.output_vcf_index
-    File output_vcf = ConvertGVCFtoVCF.output_vcf
-    File output_vcf_index = ConvertGVCFtoVCF.output_vcf_index
-
-    #MERGE bam file
-    File? haplotype_bam = MergeBams.output_bam
-    File? haplotype_bam_index = MergeBams.output_bam_index
+    File output_vcf = PostProcessing.output_vcf
+    File output_vcf_index = PostProcessing.output_vcf_index
 
     File output_cram = UltimaGenomicsWholeGenomeCramOnly.output_cram
     File output_cram_index = UltimaGenomicsWholeGenomeCramOnly.output_cram_index
@@ -216,10 +171,6 @@ workflow UltimaGenomicsWholeGenomeGermline {
 
     File selfSM = UltimaGenomicsWholeGenomeCramOnly.selfSM
     Float contamination = UltimaGenomicsWholeGenomeCramOnly.contamination
-
-    # VCF post-processing
-    File filtered_vcf = FilterVCF.output_vcf_filtered
-    File filtered_vcf_index = FilterVCF.output_vcf_filtered_index
 
     # STATISTIC COLLECTION
     File quality_yield_metrics = UltimaGenomicsWholeGenomeCramOnly.quality_yield_metrics
@@ -243,4 +194,208 @@ workflow UltimaGenomicsWholeGenomeGermline {
     String id = UltimaGenomicsWholeGenomeCramOnly.id
   }
 
+}
+
+task MakeInferenceExamples {
+  input {
+    Array[File] bam_files
+    Array[File] bam_index_files
+    File interval
+    Float total_number_of_shards
+    References references
+
+    String alt_aligned_pileup
+    Float min_fraction_hmer_indels
+    Float min_fraction_non_hmer_indels
+    Float min_fraction_snps
+    Int min_base_quality
+    Int candidate_min_mapping_quality
+    Int pileup_min_mapping_quality
+    Int dbg_min_base_quality
+    Int min_windows_distance
+    String? ug_channels_args
+    Int vsc_max_background_count
+    Float vsc_max_background_fraction
+
+    # Background sample inputs
+    File? background_bam_file
+    File? background_bam_index_file
+    String make_examples_executable
+
+    String dv_docker
+    File monitoring_script
+
+    Int preemptible_tries
+  }
+  # Estimate output_size that fits candidate generated parameters (assuming constant image size)
+  #   More sensitive thresholds (such as used for somatic variant detection) yield more examples (images)
+  #   which consume more disk-space, regardless of the input-size.
+  Float min_threshold_tmp = if min_fraction_hmer_indels < min_fraction_non_hmer_indels then min_fraction_hmer_indels else min_fraction_non_hmer_indels
+  Float min_threshold = if min_threshold_tmp < min_fraction_snps then min_threshold_tmp else min_fraction_snps
+  # solving linear equation for min_threshold=0.03 -> output_size=3000GB,
+  #                             min_threshold=0.12 -> output_size=60GB
+  Float a = -98000 / 3
+  Float b = 3980
+  Float expected_genome_wide_output = min_threshold * a + b
+  Int expected_output_size = ceil(expected_genome_wide_output / total_number_of_shards)
+  Int inputs_size =  ceil((size(bam_files, "GB") + size(background_bam_file, "GB")) / total_number_of_shards + size(references.ref_fasta, "GB"))
+  
+  Float c_i = 1.2  # inputs safety factor
+  Float c_o = 2.5 # outputs safety factor
+  Int disk_size = ceil(c_i * inputs_size + c_o * expected_output_size)
+
+  String examples_filename = basename(interval, ".interval_list") + ".inference_examples.tfrecord.gz"
+
+  parameter_meta {
+      bam_files: {
+          localization_optional: true
+      }
+      background_bam_file: {
+          localization_optional: true
+      }
+  }
+
+  command <<<
+    set -eo pipefail
+
+    bash ~{monitoring_script} > monitoring.log &
+
+    /opt/gatk-4.2.6.1/gatk --java-options "-Xms1G" PrintReads \
+        -I ~{sep=' -I ' bam_files} \
+        -O input.bam \
+        -L ~{interval} \
+        -R ~{references.ref_fasta}
+
+    defined_background=~{true="true" false="false" defined(background_bam_file)}
+    if $defined_background ; then
+      /opt/gatk-4.2.6.1/gatk --java-options "-Xms1G" PrintReads \
+          -I ~{background_bam_file} \
+          -O background.bam \
+          -L ~{interval} \
+          -R ~{references.ref_fasta}
+    fi
+
+    /opt/gatk-4.2.6.1/gatk IntervalListToBed -I ~{interval} -O interval.bed
+
+    /opt/deepvariant/bin/~{make_examples_executable} \
+      --mode calling \
+      --ref ~{references.ref_fasta} \
+      --reads "input.bam~{true=";background.bam" false="" defined(background_bam_file)}" \
+      --examples ~{examples_filename} \
+      --alt_aligned_pileup ~{alt_aligned_pileup} \
+      --min_base_quality ~{min_base_quality} \
+      --dbg_min_base_quality ~{dbg_min_base_quality} \
+      --vsc_min_fraction_indels ~{min_fraction_non_hmer_indels} \
+      --vsc_min_fraction_hmer_indels ~{min_fraction_hmer_indels} \
+      --vsc_min_fraction_snps ~{min_fraction_snps} \
+      --ws_min_windows_distance ~{min_windows_distance} \
+      --vsc_max_background_count ~{vsc_max_background_count} \
+      --vsc_max_background_fraction ~{vsc_max_background_fraction} \
+      --min_mapping_quality ~{pileup_min_mapping_quality} \
+      --candidate_min_mapping_quality ~{candidate_min_mapping_quality} \
+      --output_only_sample_role_to_train \
+      --regions interval.bed \
+      ~{ug_channels_args} \
+
+    echo "Finished make_examples task!"
+
+  >>>
+  runtime {
+    memory: "2.5 GB"
+    cpu: "1"
+    disks: "local-disk " + disk_size + " HDD"
+    docker: dv_docker
+    preemptible: preemptible_tries
+  }
+  output {
+    File monitoring_log = "monitoring.log"
+    File output_examples = examples_filename
+  }
+}
+
+task CallVariants{
+  input{
+    Array[File] examples
+    File model
+    File model_index
+    File model_meta
+    String dv_docker
+    String call_variants_exec
+    Int total_number_of_shards
+    File monitoring_script
+    Int disk_size = ceil(1.2 * size(examples, 'GB') + 2 * size(model, 'GB'))
+  }
+  command <<<
+    bash ~{monitoring_script} > monitoring.log &
+
+    # Create symlinks with the naming convention prefered by deepvariant
+    echo ~{sep="," examples} > files.txt
+    python -c 'import os; \
+      file_list=open("files.txt").read().rstrip().split(","); \
+      nfiles_string=str(len(file_list)).zfill(5); \
+      [os.symlink(filename, f"examples.tfrecord-{str(i).zfill(5)}-of-{nfiles_string}.gz") \
+      for i,filename in enumerate(file_list)]'
+
+    ls *.gz
+
+    /opt/deepvariant/bin/~{call_variants_exec} \
+      --outfile call_variants_output.tfrecord.gz \
+      --examples examples.tfrecord@~{total_number_of_shards}.gz \
+      --checkpoint $(echo ~{model_index} | sed s/.index$// )
+  >>>
+  runtime {
+    memory: "14 GB"
+    cpu: "4"
+    disks: "local-disk " + disk_size + " HDD"
+    docker: dv_docker
+    gpuType: "nvidia-tesla-k80"
+    gpuCount: 1
+    nvidiaDriverVersion: "418.87.00"
+  }
+  output {
+    File monitoring_log = "monitoring.log"
+    File output_records = 'call_variants_output.tfrecord.gz'
+  }
+}
+
+task PostProcessing{
+  input{
+    File called_records
+    File ref
+    File ref_index
+    String dv_docker
+    String output_prefix
+    File monitoring_script
+    Boolean make_gvcf = false
+    Int disk_size = ceil(48 * size(called_records, "GB") +
+                         size(ref, "GB") + 
+                         (if make_gvcf then 12 else 0 ) + 4)
+    Int memory = ceil(64 * size(called_records, "GB"))
+  }
+  command <<<
+    bash ~{monitoring_script} > monitoring.log &
+    /opt/deepvariant/bin/postprocess_variants \
+      --ref ~{ref} \
+      --infile ~{called_records} \
+      --outfile ~{output_prefix}.vcf.gz \
+      ~{true='--gvcf_outfile temp_name.g.vcf.gz' false='' make_gvcf} \
+      --vcf_stats_report=False
+
+    rename_gvcf=~{true="true" false="false" make_gvcf}
+    if $rename_gvcf ; then
+      mv temp_name.g.vcf.gz ~{output_prefix}.g.vcf.gz
+    fi
+  >>>
+  runtime {
+    memory: "~{memory} GB"
+    cpu: "1"
+    disks: "local-disk " + disk_size + " HDD"
+    docker: dv_docker
+  }
+  output {
+    File monitoring_log = "monitoring.log"
+    File vcf_file = '~{output_prefix}.vcf.gz'
+    File vcf_index = '~{output_prefix}.vcf.gz.tbi'
+    File? gvcf_file = '~{output_prefix}.g.vcf.gz'
+  }
 }
