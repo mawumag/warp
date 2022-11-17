@@ -30,6 +30,10 @@ workflow UltimaGenomicsWholeGenomeGermline {
     Boolean make_haplotype_bam = false
     Int reads_per_split = 20000000
     String filtering_model_no_gt_name = "rf_model_ignore_gt_incl_hpol_runs"
+
+    File original_gvcf
+    File original_gvcf_index
+    String flow_order
   }
 
   meta {
@@ -55,69 +59,17 @@ workflow UltimaGenomicsWholeGenomeGermline {
 
   References references = alignment_references.references
 
-  call UltimaGenomicsWholeGenomeCramOnly.UltimaGenomicsWholeGenomeCramOnly {
+  call RemoveTreeScoreAnnotation {
     input:
-      contamination_sites = contamination_sites,
-      alignment_references = alignment_references,
-      input_cram_list = input_cram_list,
-      input_bam_list = input_bam_list,
-      base_file_name = base_file_name,
-      rsq_threshold = rsq_threshold,
-      reads_per_split = reads_per_split,
-      vcf_post_processing = vcf_post_processing,
-      save_bam_file = true
-  }
-
-  # Break the calling interval_list into sub-intervals
-  # Perform variant calling on the sub-intervals, and then gather the results
-  call Utilities.ScatterIntervalList {
-    input:
-      interval_list               = variant_calling_settings.wgs_calling_interval_list,
-      scatter_count               = variant_calling_settings.haplotype_scatter_count,
-      break_bands_at_multiples_of = variant_calling_settings.break_bands_at_multiples_of
-  }
-
-  # We need disk to localize the sharded input and output due to the scatter for HaplotypeCaller.
-  # If we take the number we are scattering by and reduce by factor 2 we will have enough disk space
-  # to account for the fact that the data is quite uneven across the shards.
-  Int hc_divisor = ScatterIntervalList.interval_count / 2
-
-  # Call variants in parallel over WGS calling intervals
-  scatter (index in range(ScatterIntervalList.interval_count)) {
-    # Generate VCF by interval
-    call Tasks.HaplotypeCaller as HaplotypeCaller {
-      input:
-        input_bam_list  = [select_first([UltimaGenomicsWholeGenomeCramOnly.output_bam])],
-        input_bam_index_list = [select_first([UltimaGenomicsWholeGenomeCramOnly.output_bam_index])],
-        interval_list   = ScatterIntervalList.out[index],
-        vcf_basename    = UltimaGenomicsWholeGenomeCramOnly.output_safe_name,
-        references      = references,
-        make_bamout     = make_haplotype_bam
-    }
-  }
-
-  # Combine by-interval VCFs into a single sample  file
-  call VariantDiscoverTasks.MergeVCFs {
-    input:
-      input_vcfs          = HaplotypeCaller.output_vcf,
-      input_vcfs_indexes  = HaplotypeCaller.output_vcf_index,
-      output_vcf_name     = UltimaGenomicsWholeGenomeCramOnly.output_safe_name + ".g.vcf.gz",
-  }
-
-  # Combine by-interval BAMs into a single sample file
-  if(merge_bam_file && make_haplotype_bam) {
-      call Tasks.MergeBams {
-        input:
-          input_bams      = HaplotypeCaller.bamout,
-          output_bam_name = UltimaGenomicsWholeGenomeCramOnly.output_safe_name + ".bam",
-      }
+      original_gvcf = original_gvcf,
+      original_gvcf_index = original_gvcf_index
   }
 
   call Tasks.ConvertGVCFtoVCF {
     input:
-      input_gvcf         = MergeVCFs.output_vcf,
-      input_gvcf_index   = MergeVCFs.output_vcf_index,
-      output_vcf_name    = UltimaGenomicsWholeGenomeCramOnly.output_safe_name + '.vcf.gz',
+      input_gvcf         = RemoveTreeScoreAnnotation.output_vcf,
+      input_gvcf_index   = RemoveTreeScoreAnnotation.output_vcf_index,
+      output_vcf_name    = base_file_name + '.vcf.gz',
       references         = references
   }
 
@@ -129,15 +81,15 @@ workflow UltimaGenomicsWholeGenomeGermline {
       references              = references,
       reference_dbsnp         = vcf_post_processing.ref_dbsnp,
       reference_dbsnp_index   = vcf_post_processing.ref_dbsnp_index,
-      flow_order              = UltimaGenomicsWholeGenomeCramOnly.flow_order,
-      final_vcf_base_name     = UltimaGenomicsWholeGenomeCramOnly.output_safe_name
+      flow_order              = flow_order,
+      final_vcf_base_name     = base_file_name
   }
 
   call Tasks.AddIntervalAnnotationsToVCF {
     input:
       input_vcf             = AnnotateVCF.output_vcf_annotated,
       input_vcf_index       = AnnotateVCF.output_vcf_annotated_index,
-      final_vcf_base_name   = UltimaGenomicsWholeGenomeCramOnly.output_safe_name,
+      final_vcf_base_name   = base_file_name,
       annotation_intervals  = vcf_post_processing.annotation_intervals
   }
 
@@ -145,7 +97,7 @@ workflow UltimaGenomicsWholeGenomeGermline {
     input:
       input_file                = AddIntervalAnnotationsToVCF.output_vcf,
       input_file_index          = AddIntervalAnnotationsToVCF.output_vcf_index,
-      input_vcf_name            = UltimaGenomicsWholeGenomeCramOnly.output_safe_name,
+      input_vcf_name            = base_file_name,
       blocklist_file            = vcf_post_processing.training_blocklist_file,
       ref_fasta                 = references.ref_fasta,
       ref_index                 = references.ref_fasta_index,
@@ -163,7 +115,7 @@ workflow UltimaGenomicsWholeGenomeGermline {
       input_vcf_index       = AddIntervalAnnotationsToVCF.output_vcf_index,
       af_only_gnomad        = vcf_post_processing.af_only_gnomad,
       af_only_gnomad_index  = vcf_post_processing.af_only_gnomad_index,
-      final_vcf_base_name   = UltimaGenomicsWholeGenomeCramOnly.output_safe_name
+      final_vcf_base_name   = base_file_name
   }
 
   call Tasks.FilterVCF {
@@ -174,8 +126,8 @@ workflow UltimaGenomicsWholeGenomeGermline {
       references              = references,
       model_name              = filtering_model_no_gt_name,
       filter_cg_insertions    = vcf_post_processing.filter_cg_insertions,
-      final_vcf_base_name     = UltimaGenomicsWholeGenomeCramOnly.output_safe_name,
-      flow_order              = UltimaGenomicsWholeGenomeCramOnly.flow_order,
+      final_vcf_base_name     = base_file_name,
+      flow_order              = flow_order,
       annotation_intervals    = vcf_post_processing.annotation_intervals
   }
 
@@ -183,8 +135,8 @@ workflow UltimaGenomicsWholeGenomeGermline {
     input:
       filtered_vcf        = FilterVCF.output_vcf_filtered,
       filtered_vcf_index  = FilterVCF.output_vcf_filtered_index,
-      gvcf                = MergeVCFs.output_vcf,
-      gvcf_index          = MergeVCFs.output_vcf_index
+      gvcf                = original_gvcf,
+      gvcf_index          = original_gvcf_index
   }
 
   call ReblockGVCF.ReblockGVCF {
@@ -206,41 +158,36 @@ workflow UltimaGenomicsWholeGenomeGermline {
     File output_vcf = ConvertGVCFtoVCF.output_vcf
     File output_vcf_index = ConvertGVCFtoVCF.output_vcf_index
 
-    #MERGE bam file
-    File? haplotype_bam = MergeBams.output_bam
-    File? haplotype_bam_index = MergeBams.output_bam_index
-
-    File output_cram = UltimaGenomicsWholeGenomeCramOnly.output_cram
-    File output_cram_index = UltimaGenomicsWholeGenomeCramOnly.output_cram_index
-    File output_cram_md5 = UltimaGenomicsWholeGenomeCramOnly.output_cram_md5
-
-    File selfSM = UltimaGenomicsWholeGenomeCramOnly.selfSM
-    Float contamination = UltimaGenomicsWholeGenomeCramOnly.contamination
-
     # VCF post-processing
     File filtered_vcf = FilterVCF.output_vcf_filtered
     File filtered_vcf_index = FilterVCF.output_vcf_filtered_index
-
-    # STATISTIC COLLECTION
-    File quality_yield_metrics = UltimaGenomicsWholeGenomeCramOnly.quality_yield_metrics
-    File wgs_metrics = UltimaGenomicsWholeGenomeCramOnly.wgs_metrics
-    File raw_wgs_metrics = UltimaGenomicsWholeGenomeCramOnly.raw_wgs_metrics
-    File duplicate_metrics = UltimaGenomicsWholeGenomeCramOnly.duplicate_metrics
-    File agg_alignment_summary_metrics = UltimaGenomicsWholeGenomeCramOnly.agg_alignment_summary_metrics
-    File? agg_alignment_summary_pdf = UltimaGenomicsWholeGenomeCramOnly.agg_alignment_summary_pdf
-    File agg_gc_bias_detail_metrics = UltimaGenomicsWholeGenomeCramOnly.agg_gc_bias_detail_metrics
-    File agg_gc_bias_pdf = UltimaGenomicsWholeGenomeCramOnly.agg_gc_bias_pdf
-    File agg_gc_bias_summary_metrics = UltimaGenomicsWholeGenomeCramOnly.agg_gc_bias_summary_metrics
-    File agg_quality_distribution_pdf = UltimaGenomicsWholeGenomeCramOnly.agg_quality_distribution_pdf
-    File agg_quality_distribution_metrics = UltimaGenomicsWholeGenomeCramOnly.agg_quality_distribution_metrics
-    Float duplication_rate = UltimaGenomicsWholeGenomeCramOnly.duplication_rate
-    Float chimerism_rate = UltimaGenomicsWholeGenomeCramOnly.chimerism_rate
-    Boolean is_outlier_data = UltimaGenomicsWholeGenomeCramOnly.is_outlier_data
-
-    String sample_name = UltimaGenomicsWholeGenomeCramOnly.sample_name
-    String flow_order = UltimaGenomicsWholeGenomeCramOnly.flow_order
-    String barcode = UltimaGenomicsWholeGenomeCramOnly.barcode
-    String id = UltimaGenomicsWholeGenomeCramOnly.id
   }
 
+}
+
+
+task RemoveTreeScoreAnnotation {
+  input {
+    File original_gvcf
+    File original_gvcf_index
+    String base_file_name
+  }
+
+  command {
+    set -eo pipefail
+
+    bcftools annotate -x INFO/TREE_SCORE -o ~{base_file_name}.g.vcf.gz -O z ~{original_gvcf}
+    bcftools index -t ~{base_file_name}.g.vcf.gz
+  }
+  output {
+    File output_vcf = "~{base_file_name}.g.vcf.gz"
+    File output_vcf_index = "~{base_file_name}.g.vcf.gz.tbi"
+  }
+
+  runtime {
+        memory: "8GB"
+        disks: "local-disk " + (ceil(size(original_gvcf, "GB")) * 2 + 10) + " HDD"
+        docker: "us.gcr.io/broad-gotc-prod/imputation-bcf-vcf:1.0.6-1.10.2-0.1.16-1659548257"
+        cpu: 1
+    }
 }
