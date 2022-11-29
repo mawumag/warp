@@ -1,7 +1,7 @@
 version 1.0
 
 import "../../../../../../tasks/broad/JointGenotypingTasks.wdl" as Tasks
-import "https://raw.githubusercontent.com/broadinstitute/gatk/4.3.0.0/scripts/vcf_site_level_filtering_wdl/JointVcfFiltering.wdl" as Filtering
+import "https://raw.githubusercontent.com/broadinstitute/gatk/sl_simple_joint_vcf_filtering_wdl/scripts/vcf_site_level_filtering_wdl/JointVcfFiltering.wdl" as Filtering
 import "../../../../../../tasks/broad/UltimaGenomicsGermlineFilteringThreshold.wdl" as FilteringThreshold
 
 
@@ -154,24 +154,42 @@ workflow UltimaGenomicsJointGenotyping {
       disk_size = medium_disk
   }
 
-  call Filtering.JointVcfFiltering as TrainAndApplyFilteringModel {
+  call Filtering.JointVcfFiltering as TrainAndScoreFilteringModelSNPs {
     input:
-      vcf = CalculateAverageAnnotations.output_vcf,
-      vcf_index = CalculateAverageAnnotations.output_vcf_index,
+      input_vcfs = CalculateAverageAnnotations.output_vcf,
+      input_vcf_idxs = CalculateAverageAnnotations.output_vcf_index,
       sites_only_vcf = SitesOnlyGatherVcf.output_vcf,
-      sites_only_vcf_index = SitesOnlyGatherVcf.output_vcf_index,
-      snp_annotations = snp_annotations,
-      indel_annotations = indel_annotations,
+      sites_only_vcf_idx = SitesOnlyGatherVcf.output_vcf_index,
+      output_prefix = callset_name,
+      annotations = snp_annotations,
+      resource_args = "--resource:hapmap,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/hapmap_3.3.hg38.vcf.gz --resource:omni,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/1000G_omni2.5.hg38.vcf.gz --resource:1000G,training=true,calibration=false gs://gcp-public-data--broad-references/hg38/v0/1000G_phase1.snps.high_confidence.hg38.vcf.gz",
       model_backend = model_backend,
-      use_allele_specific_annotations = use_allele_specific_annotations,
-      basename = callset_name,
+      extract_extra_args = " --use-allele-specific-annotations --mode SNP",
+      train_extra_args = " --use-allele-specific-annotations --mode SNP",
+      score_extra_args =" --use-allele-specific-annotations --mode SNP",
+      gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
+  }
+
+  call Filtering.JointVcfFiltering as TrainAndScoreFilteringModelINDELs {
+    input:
+      input_vcfs = TrainAndScoreFilteringModelSNPs.output_vcf,
+      input_vcf_idxs = TrainAndScoreFilteringModelSNPs.output_vcf_index,
+      sites_only_vcf = SitesOnlyGatherVcf.output_vcf,
+      sites_only_vcf_idx = SitesOnlyGatherVcf.output_vcf_index,
+      output_prefix = callset_name,
+      annotations = indel_annotations,
+      resource_args = "--resource:mills,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz",
+      model_backend = model_backend,
+      extract_extra_args = " --use-allele-specific-annotations --mode INDEL",
+      train_extra_args = " --use-allele-specific-annotations --mode INDEL",
+      score_extra_args =" --use-allele-specific-annotations --mode INDEL",
       gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
   }
 
   call FilteringThreshold.ExtractOptimizeSingleSample as FindFilteringThresholdAndFilter {
     input:
-      input_vcf = TrainAndApplyFilteringModel.variant_scored_vcf,
-      input_vcf_index = TrainAndApplyFilteringModel.variant_scored_vcf_index,
+      input_vcf = TrainAndScoreFilteringModelINDELs.variant_scored_vcf,
+      input_vcf_index = TrainAndScoreFilteringModelINDELs.variant_scored_vcf_index,
       base_file_name = callset_name,
       call_sample_name = call_sample_name,
       truth_vcf = truth_vcf,
