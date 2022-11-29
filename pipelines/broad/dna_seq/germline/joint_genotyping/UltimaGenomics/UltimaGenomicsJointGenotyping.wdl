@@ -172,8 +172,8 @@ workflow UltimaGenomicsJointGenotyping {
 
   call Filtering.JointVcfFiltering as TrainAndScoreFilteringModelINDELs {
     input:
-      input_vcfs = TrainAndScoreFilteringModelSNPs.output_vcf,
-      input_vcf_idxs = TrainAndScoreFilteringModelSNPs.output_vcf_index,
+      input_vcfs = TrainAndScoreFilteringModelSNPs.scored_vcfs,
+      input_vcf_idxs = TrainAndScoreFilteringModelSNPs.scored_vcf_idxs,
       sites_only_vcf = SitesOnlyGatherVcf.output_vcf,
       sites_only_vcf_idx = SitesOnlyGatherVcf.output_vcf_index,
       output_prefix = callset_name,
@@ -188,8 +188,8 @@ workflow UltimaGenomicsJointGenotyping {
 
   call FilteringThreshold.ExtractOptimizeSingleSample as FindFilteringThresholdAndFilter {
     input:
-      input_vcf = TrainAndScoreFilteringModelINDELs.variant_scored_vcf,
-      input_vcf_index = TrainAndScoreFilteringModelINDELs.variant_scored_vcf_index,
+      input_vcf = TrainAndScoreFilteringModelINDELs.scored_vcfs,
+      input_vcf_index = TrainAndScoreFilteringModelINDELs.scored_vcf_idxs,
       base_file_name = callset_name,
       call_sample_name = call_sample_name,
       truth_vcf = truth_vcf,
