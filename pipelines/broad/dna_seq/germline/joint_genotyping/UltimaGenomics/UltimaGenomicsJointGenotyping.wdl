@@ -51,8 +51,8 @@ workflow UltimaGenomicsJointGenotyping {
     String flow_order
 
     #inputs for training and applying filter model
-    String snp_annotations
-    String indel_annotations
+    Array[String] snp_annotations
+    Array[String] indel_annotations
     Boolean use_allele_specific_annotations
     String model_backend
 
