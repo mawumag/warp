@@ -206,7 +206,7 @@ workflow UltimaGenomicsJointGenotyping {
       medium_disk = medium_disk
   }
 
-  scatter (idx in range(length(TrainAndApplyFilteringModel.variant_scored_vcf))) {
+  scatter (idx in range(length(TrainAndScoreFilteringModelINDELs.scored_vcfs))) {
     # For large callsets we need to collect metrics from the shards and gather them later.
     if (!is_small_callset) {
       call Tasks.CollectVariantCallingMetrics as CollectMetricsSharded {
