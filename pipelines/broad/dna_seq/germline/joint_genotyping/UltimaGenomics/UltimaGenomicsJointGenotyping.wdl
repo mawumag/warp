@@ -167,7 +167,7 @@ workflow UltimaGenomicsJointGenotyping {
       extract_extra_args = " --use-allele-specific-annotations --mode SNP",
       train_extra_args = " --use-allele-specific-annotations --mode SNP",
       score_extra_args =" --use-allele-specific-annotations --mode SNP",
-      gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
+      gatk_docker = "us.gcr.io/broad-dsde-methods/broad-gatk-snapshots/gatk-remote-builds:mshand-9bfc3599f38fe428d38d6f0dfb5a296e65b03221-4.3.0.0-17-g9bfc3599f"
   }
 
   call Filtering.JointVcfFiltering as TrainAndScoreFilteringModelINDELs {
@@ -183,7 +183,7 @@ workflow UltimaGenomicsJointGenotyping {
       extract_extra_args = " --use-allele-specific-annotations --mode INDEL",
       train_extra_args = " --use-allele-specific-annotations --mode INDEL",
       score_extra_args =" --use-allele-specific-annotations --mode INDEL",
-      gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
+      gatk_docker = "us.gcr.io/broad-dsde-methods/broad-gatk-snapshots/gatk-remote-builds:mshand-9bfc3599f38fe428d38d6f0dfb5a296e65b03221-4.3.0.0-17-g9bfc3599f"
   }
 
   call FilteringThreshold.ExtractOptimizeSingleSample as FindFilteringThresholdAndFilter {
