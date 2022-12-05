@@ -98,3 +98,7 @@ workflows:
   - name: UltimaGenomicsWholeGenomeCramOnly
     subclass: WDL
     primaryDescriptorPath: /pipelines/broad/dna_seq/somatic/single_sample/ugwgs/UltimaGenomicsWholeGenomeCramOnly.wdl
+
+  - name: dv_inference
+    subclass: WDL
+    primaryDescriptorPath: /pipelines/broad/dna_seq/germline/single_sample/ugwgs/dv_inference.wdl
