@@ -165,7 +165,7 @@ workflow UltimaGenomicsJointGenotyping {
       resource_args = "--resource:hapmap,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/hapmap_3.3.hg38.vcf.gz --resource:omni,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/1000G_omni2.5.hg38.vcf.gz --resource:1000G,training=true,calibration=false gs://gcp-public-data--broad-references/hg38/v0/1000G_phase1.snps.high_confidence.hg38.vcf.gz",
       model_backend = model_backend,
       extract_extra_args = " --use-allele-specific-annotations --mode SNP",
-      train_extra_args = " --use-allele-specific-annotations --mode SNP",
+      train_extra_args = " --mode SNP",
       score_extra_args =" --use-allele-specific-annotations --mode SNP",
       gatk_docker = "us.gcr.io/broad-dsde-methods/broad-gatk-snapshots/gatk-remote-builds:mshand-9bfc3599f38fe428d38d6f0dfb5a296e65b03221-4.3.0.0-17-g9bfc3599f"
   }
@@ -181,7 +181,7 @@ workflow UltimaGenomicsJointGenotyping {
       resource_args = "--resource:mills,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz",
       model_backend = model_backend,
       extract_extra_args = " --use-allele-specific-annotations --mode INDEL",
-      train_extra_args = " --use-allele-specific-annotations --mode INDEL",
+      train_extra_args = " --mode INDEL",
       score_extra_args =" --use-allele-specific-annotations --mode INDEL",
       gatk_docker = "us.gcr.io/broad-dsde-methods/broad-gatk-snapshots/gatk-remote-builds:mshand-9bfc3599f38fe428d38d6f0dfb5a296e65b03221-4.3.0.0-17-g9bfc3599f"
   }
