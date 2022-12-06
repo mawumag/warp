@@ -8,7 +8,7 @@ task global {
     String gitc_jar_path = "/usr/gitc/"
     String ug_vc_docker = "gcr.io/ultima-data-307918/ugvc:ugvc_50512d"
     String ug_gatk_picard_docker = "gcr.io/ganymede-331016/ug_gatk_picard:0.8"
-    String dv_docker = "gcr.io/ultima-data-307918/deepvariant:ug-1.4.5"
+    String dv_docker = "gcr.io/terra-project-249020/deepvariant:ug-1.4.4_8ebb16b5"
     String vbid_docker = "us.gcr.io/broad-gotc-prod/verify-bam-id:f6cb51761861e57c43879aa262df5cf8e670cf7c-1606775309"
     String sentieon_docker = "gcr.io/ganymede-331016/sentieon_docker:sentieon-genomics-202112.06"
     String ua_docker = "gcr.io/ultima-data-307918/ua:ua_394e0a"
