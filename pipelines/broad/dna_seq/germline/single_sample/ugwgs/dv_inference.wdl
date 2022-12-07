@@ -223,6 +223,7 @@ task MakeInferenceExamples {
     File monitoring_script
 
     Int preemptible_tries
+    Float machine_mem_gb = 2.5
   }
   # Estimate output_size that fits candidate generated parameters (assuming constant image size)
   #   More sensitive thresholds (such as used for somatic variant detection) yield more examples (images)
@@ -299,7 +300,7 @@ task MakeInferenceExamples {
     touch ~{gvcf_filename}
   >>>
   runtime {
-    memory: "2.5 GB"
+    memory: machine_mem_gb + " GB"
     cpu: "1"
     disks: "local-disk " + disk_size + " HDD"
     docker: dv_docker
