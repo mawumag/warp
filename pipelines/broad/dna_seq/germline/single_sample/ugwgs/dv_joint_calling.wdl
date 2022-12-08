@@ -20,7 +20,7 @@ workflow dv_joint_calling {
 }
 
 task GLnexus {
-    Array[File]+ gvcf
+    Array[File] gvcf
     File bed_file
     String config
     String output_name
