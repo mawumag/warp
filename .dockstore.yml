@@ -102,3 +102,7 @@ workflows:
   - name: dv_inference
     subclass: WDL
     primaryDescriptorPath: /pipelines/broad/dna_seq/germline/single_sample/ugwgs/dv_inference.wdl
+
+  - name: dv_joint_calling
+    subclass: WDL
+    primaryDescriptorPath: /pipelines/broad/dna_seq/germline/single_sample/ugwgs/dv_joint_calling.wdl
