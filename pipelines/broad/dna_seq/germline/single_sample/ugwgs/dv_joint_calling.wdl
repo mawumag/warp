@@ -20,15 +20,17 @@ workflow dv_joint_calling {
 }
 
 task GLnexus {
-    Array[File] gvcf
-    File bed_file
-    String config
-    String output_name
+    input {
+        Array[File]+ gvcf
+        File bed_file
+        String config
+        String output_name
+    }
 
     command <<<
         set -ex -o pipefail
         export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
-        numactl --interleave=all glnexus_cli --config "${config}" --list --bed "${bed_file}" "${write_lines(gvcf)}" | bcftools view - | bgzip -@ 4 -c > "${output_name}.vcf.gz"
+        numactl --interleave=all glnexus_cli --config "~{config}" --list --bed "~{bed_file}" "~{write_lines(gvcf)}" | bcftools view - | bgzip -@ 4 -c > "~{output_name}.vcf.gz"
     >>>
 
     runtime {
