@@ -30,7 +30,7 @@ task GLnexus {
     command <<<
         set -ex -o pipefail
         export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
-        numactl --interleave=all glnexus_cli --config "~{config}" --list --bed "~{bed_file}" ~{sep=" " gvcf} | bcftools view - | bgzip -@ 4 -c > ~{output_name}.vcf.gz
+        numactl --interleave=all glnexus_cli --config ~{config} --list --bed ~{bed_file} ~{sep=" " gvcf} | bcftools view - | bgzip -@ 4 -c > ~{output_name}.vcf.gz
     >>>
 
     runtime {
