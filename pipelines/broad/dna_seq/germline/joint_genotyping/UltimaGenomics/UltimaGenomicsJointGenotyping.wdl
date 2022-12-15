@@ -61,6 +61,7 @@ workflow UltimaGenomicsJointGenotyping {
     Boolean scatter_cross_check_fingerprints = false
 
     File gatk_jar
+    Array[File] gvcfs
   }
 
   Array[Array[String]] sample_name_map_lines = read_tsv(sample_name_map)
@@ -103,22 +104,21 @@ workflow UltimaGenomicsJointGenotyping {
     # is the optimal value for the amount of memory allocated
     # within the task; please do not change it without consulting
     # the Hellbender (GATK engine) team!
-    call Tasks.ImportGVCFs {
+    call Tasks.CombineGVCFs {
       input:
-        sample_name_map = sample_name_map,
+        gvcfs = gvcfs,
         interval = unpadded_intervals[idx],
         ref_fasta = ref_fasta,
         ref_fasta_index = ref_fasta_index,
         ref_dict = ref_dict,
-        workspace_dir_name = "genomicsdb",
+        output_base_name = "combined."+idx,
         disk_size = medium_disk,
-        batch_size = 50,
         gatk_jar = gatk_jar
     }
 
     call Tasks.GenotypeGVCFs {
         input:
-          workspace_tar = ImportGVCFs.output_genomicsdb,
+          combined_vcf = CombineGVCFs.vcf,
           interval = unpadded_intervals[idx],
           output_vcf_filename = callset_name + "." + idx + ".vcf.gz",
           ref_fasta = ref_fasta,

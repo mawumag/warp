@@ -74,6 +74,45 @@ task SplitIntervalList {
   }
 }
 
+task CombineGVCFs {
+  input {
+    Array[File] gvcfs
+    File interval
+    File ref_fasta
+    File ref_fasta_index
+    File ref_dict
+    String output_base_name
+    Int disk_size
+    String gatk_docker = "us.gcr.io/broad-gatk/gatk:4.2.6.1"
+    File gatk_jar
+  }
+  parameter_meta{
+    gvcfs: {
+      localization_optional: true
+    }
+  }
+  command <<<
+    java -Xms8000m -Xmx25000m -jar ~{gatk_jar} \
+      CombineGVCFs \
+      -L ~{interval} \
+      -V ~{sep=" -V " gvcfs} \
+      -R ~{ref_fasta} \
+      -O ~{output_base_name}.g.vcf.gz
+  >>>
+  output {
+    File vcf = "~{output_base_name}.g.vcf.gz"
+    File vcf_index = "~{output_base_name}.g.vcf.gz.tbi"
+  }
+  runtime {
+    memory: "26000 MiB"
+    cpu: 4
+    bootDiskSizeGb: 15
+    disks: "local-disk " + disk_size + " HDD"
+    docker: gatk_docker
+    preemptible: 1
+  }
+}
+
 task ImportGVCFs {
 
   input {
@@ -136,7 +175,7 @@ task ImportGVCFs {
 task GenotypeGVCFs {
 
   input {
-    File workspace_tar
+    File combined_vcf
     File interval
 
     String output_vcf_filename
@@ -161,13 +200,13 @@ task GenotypeGVCFs {
     interval: {
       localization_optional: true
     }
+    combined_vcf: {
+      localization_optional: true
+    }
   }
 
   command <<<
     set -euo pipefail
-
-    tar -xf ~{workspace_tar}
-    WORKSPACE=$(basename ~{workspace_tar} .tar)
 
     java -Xms8000m -Xmx25000m -jar ~{gatk_jar} \
       GenotypeGVCFs \
@@ -176,7 +215,7 @@ task GenotypeGVCFs {
       -D ~{dbsnp_vcf} \
       -G StandardAnnotation -G AS_StandardAnnotation \
       --only-output-calls-starting-in-intervals \
-      -V gendb://$WORKSPACE \
+      -V ~{combined_vcf} \
       -L ~{interval} \
       ~{"-A " + additional_annotation} \
       ~{true='--allow-old-rms-mapping-quality-annotation-data' false='' allow_old_rms_mapping_quality_annotation_data} \
