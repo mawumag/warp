@@ -1,8 +1,6 @@
 version 1.0
 
 import "../../../../../../tasks/broad/JointGenotypingTasks.wdl" as Tasks
-import "https://raw.githubusercontent.com/broadinstitute/gatk/4.3.0.0/scripts/vcf_site_level_filtering_wdl/JointVcfFiltering.wdl" as Filtering
-import "../../../../../../tasks/broad/UltimaGenomicsGermlineFilteringThreshold.wdl" as FilteringThreshold
 
 
 # Joint Genotyping for hg38 Whole Genomes (has not been tested on hg19) sequenced with Ultima sequencer.
@@ -61,6 +59,8 @@ workflow UltimaGenomicsJointGenotyping {
     Float unbounded_scatter_count_scale_factor = 0.15
     Boolean cross_check_fingerprints = true
     Boolean scatter_cross_check_fingerprints = false
+
+    File gatk_jar
   }
 
   Array[Array[String]] sample_name_map_lines = read_tsv(sample_name_map)
@@ -112,7 +112,8 @@ workflow UltimaGenomicsJointGenotyping {
         ref_dict = ref_dict,
         workspace_dir_name = "genomicsdb",
         disk_size = medium_disk,
-        batch_size = 50
+        batch_size = 50,
+        gatk_jar = gatk_jar
     }
 
     call Tasks.GenotypeGVCFs {
@@ -125,21 +126,13 @@ workflow UltimaGenomicsJointGenotyping {
           ref_dict = ref_dict,
           dbsnp_vcf = dbsnp_vcf,
           disk_size = medium_disk,
-          keep_combined_raw_annotations = true,
-          additional_annotation = "RawGtCount"
-    }
-
-    #TODO: if this task becomes expensive or slow we should combine the functionality into GenotypeGVCFs in GATK
-    call Tasks.CalculateAverageAnnotations {
-      input:
-        vcf = GenotypeGVCFs.output_vcf,
-        vcf_index = GenotypeGVCFs.output_vcf_index
+          gatk_jar = gatk_jar
     }
 
     call Tasks.HardFilterAndMakeSitesOnlyVcf {
       input:
-        vcf = CalculateAverageAnnotations.output_vcf,
-        vcf_index = CalculateAverageAnnotations.output_vcf_index,
+        vcf = GenotypeGVCFs.output_vcf,
+        vcf_index = GenotypeGVCFs.output_vcf_index,
         excess_het_threshold = excess_het_threshold,
         variant_filtered_vcf_filename = callset_name + "." + idx + ".variant_filtered.vcf.gz",
         sites_only_vcf_filename = callset_name + "." + idx + ".sites_only.variant_filtered.vcf.gz",
@@ -152,40 +145,6 @@ workflow UltimaGenomicsJointGenotyping {
       input_vcfs = HardFilterAndMakeSitesOnlyVcf.sites_only_vcf,
       output_vcf_name = callset_name + ".sites_only.vcf.gz",
       disk_size = medium_disk
-  }
-
-  call Filtering.JointVcfFiltering as TrainAndApplyFilteringModel {
-    input:
-      vcf = CalculateAverageAnnotations.output_vcf,
-      vcf_index = CalculateAverageAnnotations.output_vcf_index,
-      sites_only_vcf = SitesOnlyGatherVcf.output_vcf,
-      sites_only_vcf_index = SitesOnlyGatherVcf.output_vcf_index,
-      snp_annotations = snp_annotations,
-      indel_annotations = indel_annotations,
-      model_backend = model_backend,
-      use_allele_specific_annotations = use_allele_specific_annotations,
-      basename = callset_name,
-      gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
-  }
-
-  call FilteringThreshold.ExtractOptimizeSingleSample as FindFilteringThresholdAndFilter {
-    input:
-      input_vcf = TrainAndApplyFilteringModel.variant_scored_vcf,
-      input_vcf_index = TrainAndApplyFilteringModel.variant_scored_vcf_index,
-      base_file_name = callset_name,
-      call_sample_name = call_sample_name,
-      truth_vcf = truth_vcf,
-      truth_vcf_index = truth_vcf_index,
-      truth_highconf_intervals = truth_highconf_intervals,
-      truth_sample_name = truth_sample_name,
-      flow_order = flow_order,
-      ref_fasta = ref_fasta,
-      ref_fasta_index = ref_fasta_index,
-      ref_dict = ref_dict,
-      ref_fasta_sdf = ref_fasta_sdf,
-      runs_file = runs_file,
-      annotation_intervals = annotation_intervals,
-      medium_disk = medium_disk
   }
 
   scatter (idx in range(length(TrainAndApplyFilteringModel.variant_scored_vcf))) {
@@ -238,81 +197,6 @@ workflow UltimaGenomicsJointGenotyping {
     }
   }
 
-  # CrossCheckFingerprints takes forever on large callsets.
-  # We scatter over the input GVCFs to make things faster.
-  if (scatter_cross_check_fingerprints) {
-    call Tasks.GetFingerprintingIntervalIndices {
-      input:
-        unpadded_intervals = unpadded_intervals,
-        haplotype_database = haplotype_database
-    }
-
-    Array[Int] fingerprinting_indices = GetFingerprintingIntervalIndices.indices_to_fingerprint
-
-    scatter (idx in fingerprinting_indices) {
-      File vcfs_to_fingerprint = HardFilterAndMakeSitesOnlyVcf.variant_filtered_vcf[idx]
-    }
-
-    call Tasks.GatherVcfs as GatherFingerprintingVcfs {
-      input:
-        input_vcfs = vcfs_to_fingerprint,
-        output_vcf_name = callset_name + ".gathered.fingerprinting.vcf.gz",
-        disk_size = medium_disk
-    }
-
-    call Tasks.SelectFingerprintSiteVariants {
-      input:
-        input_vcf = GatherFingerprintingVcfs.output_vcf,
-        base_output_name = callset_name + ".fingerprinting",
-        haplotype_database = haplotype_database,
-        disk_size = medium_disk
-    }
-
-    call Tasks.PartitionSampleNameMap {
-      input:
-        sample_name_map = sample_name_map,
-        line_limit = 1000
-    }
-
-    scatter (idx in range(length(PartitionSampleNameMap.partitions))) {
-
-      Array[File] files_in_partition = read_lines(PartitionSampleNameMap.partitions[idx])
-
-      call Tasks.CrossCheckFingerprint as CrossCheckFingerprintsScattered {
-        input:
-          gvcf_paths = files_in_partition,
-          vcf_paths = vcfs_to_fingerprint,
-          sample_name_map = sample_name_map,
-          haplotype_database = haplotype_database,
-          output_base_name = callset_name + "." + idx,
-          scattered = true
-      }
-    }
-
-    call Tasks.GatherPicardMetrics as GatherFingerprintingMetrics {
-      input:
-        metrics_files = CrossCheckFingerprintsScattered.crosscheck_metrics,
-        output_file_name = callset_name + ".fingerprintcheck",
-        disk_size = small_disk
-    }
-  }
-
-  if (!scatter_cross_check_fingerprints) {
-
-    scatter (line in sample_name_map_lines) {
-      File gvcf_paths = line[1]
-    }
-
-    call Tasks.CrossCheckFingerprint as CrossCheckFingerprintSolo {
-      input:
-        gvcf_paths = gvcf_paths,
-        vcf_paths = HardFilterAndMakeSitesOnlyVcf.variant_filtered_vcf,
-        sample_name_map = sample_name_map,
-        haplotype_database = haplotype_database,
-        output_base_name = callset_name
-    }
-  }
-
   # Get the metrics from either code path
   File output_detail_metrics_file = select_first([CollectMetricsOnFullVcf.detail_metrics_file, GatherVariantCallingMetrics.detail_metrics_file])
   File output_summary_metrics_file = select_first([CollectMetricsOnFullVcf.summary_metrics_file, GatherVariantCallingMetrics.summary_metrics_file])
@@ -331,9 +215,6 @@ workflow UltimaGenomicsJointGenotyping {
 
     # Output the interval list generated/used by this run workflow.
     Array[File] output_intervals = SplitIntervalList.output_intervals
-
-    # Output the metrics from crosschecking fingerprints.
-    File crosscheck_fingerprint_check = select_first([CrossCheckFingerprintSolo.crosscheck_metrics, GatherFingerprintingMetrics.gathered_metrics])
   }
   meta {
     allowNestedInputs: true
