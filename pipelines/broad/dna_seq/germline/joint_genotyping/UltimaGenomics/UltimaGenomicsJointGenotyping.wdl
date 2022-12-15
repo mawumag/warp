@@ -147,13 +147,13 @@ workflow UltimaGenomicsJointGenotyping {
       disk_size = medium_disk
   }
 
-  scatter (idx in range(length(TrainAndApplyFilteringModel.variant_scored_vcf))) {
+  scatter (idx in range(length(HardFilterAndMakeSitesOnlyVcf.variant_filtered_vcf))) {
     # For large callsets we need to collect metrics from the shards and gather them later.
     if (!is_small_callset) {
       call Tasks.CollectVariantCallingMetrics as CollectMetricsSharded {
         input:
-          input_vcf = FindFilteringThresholdAndFilter.output_vcf[idx],
-          input_vcf_index = FindFilteringThresholdAndFilter.output_vcf_index[idx],
+          input_vcf = HardFilterAndMakeSitesOnlyVcf.variant_filtered_vcf[idx],
+          input_vcf_index = HardFilterAndMakeSitesOnlyVcf.variant_filtered_vcf_index[idx],
           metrics_filename_prefix = callset_name + "." + idx,
           dbsnp_vcf = dbsnp_vcf,
           dbsnp_vcf_index = dbsnp_vcf_index,
@@ -168,7 +168,7 @@ workflow UltimaGenomicsJointGenotyping {
   if (is_small_callset) {
     call Tasks.GatherVcfs as FinalGatherVcf {
       input:
-        input_vcfs = FindFilteringThresholdAndFilter.output_vcf,
+        input_vcfs = HardFilterAndMakeSitesOnlyVcf.variant_filtered_vcf,
         output_vcf_name = callset_name + ".vcf.gz",
         disk_size = huge_disk
     }
