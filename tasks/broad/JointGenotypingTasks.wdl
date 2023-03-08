@@ -82,6 +82,7 @@ task ImportGVCFs {
     File ref_fasta
     File ref_fasta_index
     File ref_dict
+    Int genomicsdb-vcf-buffer-size = 16384
 
     String workspace_dir_name
 
@@ -113,7 +114,8 @@ task ImportGVCFs {
       --sample-name-map ~{sample_name_map} \
       --reader-threads 5 \
       --merge-input-intervals \
-      --consolidate
+      --consolidate \
+      --genomicsdb-vcf-buffer-size ~{genomicsdb-vcf-buffer-size}
 
     tar -cf ~{workspace_dir_name}.tar ~{workspace_dir_name}
   >>>
