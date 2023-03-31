@@ -153,7 +153,7 @@ task GenotypeGVCFs {
     # This is needed for gVCFs generated with GATK3 HaplotypeCaller
     Boolean allow_old_rms_mapping_quality_annotation_data = false
     String gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
-    String? gatk_jar
+    File? gatk_jar
   }
 
   parameter_meta {
