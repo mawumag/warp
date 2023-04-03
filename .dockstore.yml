@@ -102,3 +102,7 @@ workflows:
   - name: BuildIndices
     subclass: WDL
     primaryDescriptorPath: /pipelines/skylab/build_indices/BuildIndices.wdl
+
+  - name: VerifyJointGenotyping
+    subclass: WDL
+    primaryDescriptorPath: /verification/VerifyJointGenotyping.wdl
