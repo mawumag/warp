@@ -202,13 +202,13 @@ workflow JointGenotyping {
         vcf_index = genotyped_vcf_index,
         sites_only_vcf = SitesOnlyGatherVcf.output_vcf,
         sites_only_vcf_index = SitesOnlyGatherVcf.output_vcf_index,
-        snp_annotations = snp_recalibration_annotation_values,
-        indel_annotations = indel_recalibration_annotation_values,
+        annotations = snp_recalibration_annotation_values, #the snp list here includes all annotations in the indel set plus one more
         use_allele_specific_annotations = allele_specific_annotations,
         output_prefix = callset_name,
-        gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
+        gatk_docker = "us.gcr.io/broad-gatk/gatk:4.4.0.0"
     }
-  } else {
+  }
+  if (!run_vqsr_lite) {
     call Tasks.IndelsVariantRecalibrator {
       input:
         sites_only_variant_filtered_vcf = SitesOnlyGatherVcf.output_vcf,
@@ -325,8 +325,8 @@ workflow JointGenotyping {
     }
   }
 
-  Array[File] recalibrated_vcfs = run_vqsr_lite ? TrainAndApplyFilteringModel.variant_scored_vcf : ApplyRecalibration.recalibrated_vcf
-  Array[File] recalibrated_vcfs_idx = run_vqsr_lite ? TrainAndApplyFilteringModel.variant_scored_vcf_index : ApplyRecalibration.recalibrated_vcf_index
+  Array[File] recalibrated_vcfs = if run_vqsr_lite then TrainAndApplyFilteringModel.scored_vcf else ApplyRecalibration.recalibrated_vcf
+  Array[File] recalibrated_vcfs_idx = if run_vqsr_lite then TrainAndApplyFilteringModel.scored_vcf_index else ApplyRecalibration.recalibrated_vcf_index
 
   # For large callsets we need to collect metrics from the shards and gather them later.
   if (!is_small_callset) {
