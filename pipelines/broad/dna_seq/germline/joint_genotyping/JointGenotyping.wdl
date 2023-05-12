@@ -196,6 +196,7 @@ workflow JointGenotyping {
   }
 
   String allele_specific_extra_args = if allele_specific_annotations then "--use-allele-specific-annotations" else ""
+  String calibration_extra_args = " --snp-calibration-sensitivity-threshold 0.997 --indel-calibration-sensitivity-threshold 0.99 "
 
   call Filtering.JointVcfFiltering as TrainAndApplyFilteringModel {
     input:
@@ -205,7 +206,7 @@ workflow JointGenotyping {
       sites_only_vcf_idx = SitesOnlyGatherVcf.output_vcf_index,
       annotations = snp_recalibration_annotation_values, #the snp list here includes all annotations in the indel set plus one more
       extract_extra_args = allele_specific_extra_args,
-      score_extra_args = allele_specific_extra_args,
+      score_extra_args = allele_specific_extra_args + calibration_extra_args,
       resource_args = "--resource:hapmap,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/hapmap_3.3.hg38.vcf.gz --resource:omni,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/1000G_omni2.5.hg38.vcf.gz --resource:1000G,training=true gs://gcp-public-data--broad-references/hg38/v0/1000G_phase1.snps.high_confidence.hg38.vcf.gz --resource:mills,training=true,calibration=true gs://gcp-public-data--broad-references/hg38/v0/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz",
       output_prefix = callset_name,
       gatk_docker = "us.gcr.io/broad-gatk/gatk:4.4.0.0"
