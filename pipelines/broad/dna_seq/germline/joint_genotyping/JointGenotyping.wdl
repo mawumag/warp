@@ -208,8 +208,8 @@ workflow JointGenotyping {
       gatk_docker = "us.gcr.io/broad-gatk/gatk:4.4.0.0"
   }
 
-  Array[File] recalibrated_vcfs = TrainAndApplyFilteringModel.scored_vcf
-  Array[File] recalibrated_vcfs_idx = TrainAndApplyFilteringModel.scored_vcf_idx
+  Array[File] recalibrated_vcfs = TrainAndApplyFilteringModel.variant_scored_vcf
+  Array[File] recalibrated_vcfs_idx = TrainAndApplyFilteringModel.variant_scored_vcf_index
 
   scatter (idx in range(length(HardFilterAndMakeSitesOnlyVcf.variant_filtered_vcf))) {
     # For large callsets we need to collect metrics from the shards and gather them later.
