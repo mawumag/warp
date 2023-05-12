@@ -208,16 +208,13 @@ workflow JointGenotyping {
       gatk_docker = "us.gcr.io/broad-gatk/gatk:4.4.0.0"
   }
 
-  Array[File] recalibrated_vcfs = TrainAndApplyFilteringModel.variant_scored_vcf
-  Array[File] recalibrated_vcfs_idx = TrainAndApplyFilteringModel.variant_scored_vcf_index
-
   scatter (idx in range(length(HardFilterAndMakeSitesOnlyVcf.variant_filtered_vcf))) {
     # For large callsets we need to collect metrics from the shards and gather them later.
     if (!is_small_callset) {
       call Tasks.CollectVariantCallingMetrics as CollectMetricsSharded {
         input:
-          input_vcf = recalibrated_vcfs,
-          input_vcf_index = recalibrated_vcfs_idx,
+          input_vcf = TrainAndApplyFilteringModel.scored_vcfs,
+          input_vcf_index = TrainAndApplyFilteringModel.scored_vcf_idxs,
           metrics_filename_prefix = callset_name + "." + idx,
           dbsnp_vcf = dbsnp_vcf,
           dbsnp_vcf_index = dbsnp_vcf_index,
@@ -232,7 +229,7 @@ workflow JointGenotyping {
   if (is_small_callset) {
     call Tasks.GatherVcfs as FinalGatherVcf {
       input:
-        input_vcfs = recalibrated_vcfs,
+        input_vcfs = TrainAndApplyFilteringModel.scored_vcfs,
         output_vcf_name = callset_name + ".vcf.gz",
         disk_size = huge_disk
     }
@@ -330,7 +327,7 @@ if (cross_check_fingerprints) {
     call Tasks.CrossCheckFingerprint as CrossCheckFingerprintSolo {
       input:
         gvcf_paths = gvcf_paths,
-        vcf_paths = recalibrated_vcfs,
+        vcf_paths = TrainAndApplyFilteringModel.scored_vcfs,
         sample_name_map = sample_name_map,
         haplotype_database = haplotype_database,
         output_base_name = callset_name
@@ -344,8 +341,8 @@ if (cross_check_fingerprints) {
   File output_summary_metrics_file = select_first([CollectMetricsOnFullVcf.summary_metrics_file, GatherVariantCallingMetrics.summary_metrics_file])
 
   # Get the VCFs from either code path
-  Array[File?] output_vcf_files = if defined(FinalGatherVcf.output_vcf) then [FinalGatherVcf.output_vcf] else recalibrated_vcfs
-  Array[File?] output_vcf_index_files = if defined(FinalGatherVcf.output_vcf_index) then [FinalGatherVcf.output_vcf_index] else recalibrated_vcfs_idx
+  Array[File?] output_vcf_files = if defined(FinalGatherVcf.output_vcf) then [FinalGatherVcf.output_vcf] else TrainAndApplyFilteringModel.scored_vcfs
+  Array[File?] output_vcf_index_files = if defined(FinalGatherVcf.output_vcf_index) then [FinalGatherVcf.output_vcf_index] else TrainAndApplyFilteringModel.scored_vcf_idxs
 
   output {
     # Metrics from either the small or large callset
