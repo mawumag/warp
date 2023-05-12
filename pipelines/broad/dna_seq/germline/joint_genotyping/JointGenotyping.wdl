@@ -216,8 +216,8 @@ workflow JointGenotyping {
     if (!is_small_callset) {
       call Tasks.CollectVariantCallingMetrics as CollectMetricsSharded {
         input:
-          input_vcf = TrainAndApplyFilteringModel.scored_vcfs,
-          input_vcf_index = TrainAndApplyFilteringModel.scored_vcf_idxs,
+          input_vcf = TrainAndApplyFilteringModel.scored_vcfs[idx],
+          input_vcf_index = TrainAndApplyFilteringModel.scored_vcf_idxs[idx],
           metrics_filename_prefix = callset_name + "." + idx,
           dbsnp_vcf = dbsnp_vcf,
           dbsnp_vcf_index = dbsnp_vcf_index,
