@@ -326,7 +326,7 @@ workflow JointGenotyping {
   }
 
   Array[File] recalibrated_vcfs = if run_vqsr_lite then TrainAndApplyFilteringModel.scored_vcf else ApplyRecalibration.recalibrated_vcf
-  Array[File] recalibrated_vcfs_idx = if run_vqsr_lite then TrainAndApplyFilteringModel.scored_vcf_index else ApplyRecalibration.recalibrated_vcf_index
+  Array[File] recalibrated_vcfs_idx = if run_vqsr_lite then TrainAndApplyFilteringModel.scored_vcf_idx else ApplyRecalibration.recalibrated_vcf_index
 
   # For large callsets we need to collect metrics from the shards and gather them later.
   if (!is_small_callset) {
