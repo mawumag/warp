@@ -199,8 +199,8 @@ workflow JointGenotyping {
 
   call Filtering.JointVcfFiltering as TrainAndApplyFilteringModel {
     input:
-      vcf = genotyped_vcf,
-      vcf_index = genotyped_vcf_index,
+      input_vcfs = genotyped_vcf,
+      input_vcf_idxs = genotyped_vcf_index,
       sites_only_vcf = SitesOnlyGatherVcf.output_vcf,
       sites_only_vcf_idx = SitesOnlyGatherVcf.output_vcf_index,
       annotations = snp_recalibration_annotation_values, #the snp list here includes all annotations in the indel set plus one more
