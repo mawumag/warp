@@ -57,6 +57,8 @@ workflow JointGenotyping {
     Float indel_filter_level
     Int snp_vqsr_downsampleFactor
 
+    String extract_extra_args = ""
+
     Int? top_level_scatter_count
     Boolean? gather_vcfs
     Int snps_variant_recalibration_threshold = 500000
@@ -207,7 +209,7 @@ workflow JointGenotyping {
       sites_only_vcf = SitesOnlyGatherVcf.output_vcf,
       sites_only_vcf_idx = SitesOnlyGatherVcf.output_vcf_index,
       annotations = snp_recalibration_annotation_values, #the snp list here includes all annotations in the indel set plus one more
-      extract_extra_args = allele_specific_extra_args,
+      extract_extra_args = allele_specific_extra_args + extract_extra_args,
       score_extra_args = allele_specific_extra_args + calibration_extra_args,
       resource_args = resource_args,
       output_prefix = callset_name,
