@@ -89,6 +89,7 @@ task ImportGVCFs {
     Int batch_size
 
     String gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
+    File gatk_jar
   }
 
   command <<<
@@ -105,7 +106,7 @@ task ImportGVCFs {
     # a significant amount of non-heap memory for native libraries.
     # Also, testing has shown that the multithreaded reader initialization
     # does not scale well beyond 5 threads, so don't increase beyond that.
-    gatk --java-options "-Xms8000m -Xmx25000m" \
+    java -Xms8000m -Xmx25000m -jar ~{gatk_jar} \
       GenomicsDBImport \
       --genomicsdb-workspace-path ~{workspace_dir_name} \
       --batch-size ~{batch_size} \
@@ -153,6 +154,7 @@ task GenotypeGVCFs {
     # This is needed for gVCFs generated with GATK3 HaplotypeCaller
     Boolean allow_old_rms_mapping_quality_annotation_data = false
     String gatk_docker = "us.gcr.io/broad-gatk/gatk:4.3.0.0"
+    File gatk_jar
   }
 
   parameter_meta {
@@ -167,7 +169,7 @@ task GenotypeGVCFs {
     tar -xf ~{workspace_tar}
     WORKSPACE=$(basename ~{workspace_tar} .tar)
 
-    gatk --java-options "-Xms8000m -Xmx25000m" \
+    java -Xms8000m -Xmx25000m -jar ~{gatk_jar} \
       GenotypeGVCFs \
       -R ~{ref_fasta} \
       -O ~{output_vcf_filename} \
