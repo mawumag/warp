@@ -33,7 +33,7 @@ workflow FastQsToGvcf {
   }
 
   scatter(fastq_pair in fastq) {
-    call FastqToBam.ConvertPairedFastQsToUnmappedBamWf {
+    call FastqToBam.ConvertPairedFastQsToUnmappedBamWf as FQTUB {
       input:
         sample_name = sample_id,
         fastq_1 = fastq_pair.left,
@@ -47,7 +47,7 @@ workflow FastQsToGvcf {
     }
   }
 
-  call ExomeGermlineSingleSample.ExomeGermlineSingleSample {
+  call ExomeGermlineSingleSample.ExomeGermlineSingleSample as EGSS {
     input:
       papi_settings = papi_settings,
       references = references,
@@ -58,7 +58,7 @@ workflow FastQsToGvcf {
       sample_and_unmapped_bams = {
         "sample_name": sample_id,
         "base_file_name": sample_id,
-        "flowcell_unmapped_bams": ConvertPairedFastQsToUnmappedBamWf.output_unmapped_bam,
+        "flowcell_unmapped_bams": FQTUB.output_unmapped_bam,
         "final_gvcf_base_name":  sample_id,
         "unmapped_bam_suffix": ".unmapped.bam"
       }
@@ -66,8 +66,8 @@ workflow FastQsToGvcf {
   }
 
   output {
-    File aligned_cram = ExomeGermlineSingleSample.output_cram
-    File aligned_cram_index = ExomeGermlineSingleSample.output_cram_index
-    File output_vcf = ExomeGermlineSingleSample.output_vcf
+    File aligned_cram = EGSS.output_cram
+    File aligned_cram_index = EGSS.output_cram_index
+    File output_vcf = EGSS.output_vcf
   }
 }
