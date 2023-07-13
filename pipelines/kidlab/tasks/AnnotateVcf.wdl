@@ -17,8 +17,6 @@ task EnsemblVepAnnotateVcf {
   input {
     File input_vcf
     String output_vcf_basename
-    File vep_archive
-    String vep_data_dir = "vep_data"
     File cadd_snv
     File cadd_snv_index
     File cadd_indel
@@ -26,6 +24,12 @@ task EnsemblVepAnnotateVcf {
     File gnomad_exomes
     File gnomad_exomes_index
     File gerp_scores
+    File domino
+    File msc
+    File gdi
+    File connectome
+    File PID_panel
+    File PID_extra
     Int cpu = 2
     String memory = "8 GiB"
   }
@@ -34,11 +38,8 @@ task EnsemblVepAnnotateVcf {
     set -o pipefail
     set -e
     
-    unzip ~{vep_archive}
-    
     vep \
       --offline \
-      --dir ~{vep_data_dir} \
       -i ~{input_vcf} \
       -o STDOUT \
       --per_gene \
@@ -49,19 +50,20 @@ task EnsemblVepAnnotateVcf {
       --force_overwrite \
       --fork ~{cpu} \
       --vcf | \
-    bcftools +anno-vep - -- Domino "~{vep_data_dir}/domino_19.02.19.txt" | \
-    bcftools +anno-vep - -- MSC "~{vep_data_dir}/msc_v1.6_99.txt" | \
-    bcftools +anno-vep - -- GDI "~{vep_data_dir}/GDI.txt" | \
-    bcftools +anno-vep - -- Connectome "~{vep_data_dir}/Connectome.txt" | \
-    bcftools +anno-vep - -- PID "~{vep_data_dir}/PIDv6.txt" | \
-    bcftools +anno-vep -Oz -o ~{output_vcf_basename}.anno.vcf.gz - -- PIDg "~{vep_data_dir}/PIDg.txt"
+    bcftools +anno-vep - -- Domino "~{domino}" | \
+    bcftools +anno-vep - -- MSC "~{msc}" | \
+    bcftools +anno-vep - -- GDI "~{gdi}" | \
+    bcftools +anno-vep - -- Connectome "~{connectome}" | \
+    bcftools +anno-vep - -- PID "~{PID_panel}" | \
+    bcftools +anno-vep -Oz -o ~{output_vcf_basename}.anno.vcf.gz - -- PIDg "~{PID_extra}"
   >>>
 
   runtime {
-    docker: "mawumag/anno-vep"
+    docker: "mawumag/anno-vep-db"
     cpu: cpu
     memory: memory
     disks: "local-disk 300 SSD"
+    bootDiskSizeGb: 50
   }
   output {
     File output_vcf = "~{output_vcf_basename}.anno.vcf.gz"

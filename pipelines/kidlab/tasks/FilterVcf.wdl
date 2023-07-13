@@ -174,7 +174,6 @@ task FilterVcf {
       sed -i '1 s/^#[ ]?//' "$filter"
     done
 
-    gzip "$code".anno.txt
     zip "$code".anno.txt.zip "$code".anno.txt && rm "$code".anno.txt
 
     python3 << EOF

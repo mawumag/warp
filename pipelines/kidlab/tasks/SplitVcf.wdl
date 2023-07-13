@@ -27,8 +27,7 @@ task SplitVcf {
     set -e
 
     echo -e ~{sep="," samples} "\t" ~{sep="," kinship} "\t" ~{family_id} > sample.list
-    bcftools view -f PASS ~{input_vcf} | \
-    bcftools +split -i'GT="alt" & GQ>=20 & FMT/DP>10' -S sample.list -o . -Oz
+    bcftools +split ~{input_vcf} -i'GT="alt"' -S sample.list -o . -Oz
   >>>
 
   runtime {

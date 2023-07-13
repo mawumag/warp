@@ -4,3 +4,7 @@ workflows:
   - name: FastQsToGvcf
     subclass: WDL
     primaryDescriptorPath: /pipelines/kidlab/FastQsToGvcf.wdl
+
+  - name: AnnoFamily
+    subclass: WDL
+    primaryDescriptorPath: /pipelines/kidlab/AnnoFamily.wdl

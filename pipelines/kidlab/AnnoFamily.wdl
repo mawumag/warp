@@ -34,6 +34,12 @@ workflow AnnoFamily {
     File gnomad_exomes
     File gnomad_exomes_index
     File gerp_scores
+    File domino
+    File msc
+    File gdi
+    File connectome
+    File PID_panel
+    File PID_extra
   }
 
   call SplitVcf.SplitVcf {
@@ -48,15 +54,19 @@ workflow AnnoFamily {
     input:
       input_vcf = SplitVcf.output_vcf,
       output_vcf_basename = family_id,
-      vep_archive = vep_archive,
-      vep_data_dir = vep_data_dir,
       cadd_snv = cadd_snv,
    	  cadd_snv_index = cadd_snv_index,
       cadd_indel = cadd_indel,
       cadd_indel_index = cadd_indel_index,
       gnomad_exomes = gnomad_exomes,
       gnomad_exomes_index = gnomad_exomes_index,
-      gerp_scores = gerp_scores
+      gerp_scores = gerp_scores,
+      domino = domino,
+      msc = msc,
+      gdi = gdi,
+      connectome = connectome,
+      PID_panel = PID_panel,
+      PID_extra = PID_extra
   }
 
   call GeneratePedFile.GeneratePedFile {
