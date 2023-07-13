@@ -55,14 +55,13 @@ workflow FastQsToGvcf {
       target_interval_list = target_interval_list,
       bait_interval_list = bait_interval_list,
       bait_set_name = bait_set_name,
-      sample_and_unmapped_bams = {
-        "sample_name": sample_id,
-        "base_file_name": sample_id,
-        "flowcell_unmapped_bams": FQTUB.output_unmapped_bam,
-        "final_gvcf_base_name":  sample_id,
-        "unmapped_bam_suffix": ".unmapped.bam"
+      sample_and_unmapped_bams = object {
+        sample_name: sample_id,
+        base_file_name: sample_id,
+        flowcell_unmapped_bams: FQTUB.output_unmapped_bam,
+        final_gvcf_base_name:  sample_id,
+        unmapped_bam_suffix: ".unmapped.bam"
       }
-    
   }
 
   output {
