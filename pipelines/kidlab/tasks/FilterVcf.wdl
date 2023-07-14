@@ -214,7 +214,7 @@ task FilterVcf {
   memory: "3 GiB"
   }
   output {
-    File annotated_tsv = "~{code}.anno.zip"
+    File annotated_tsv = "~{code}.anno.txt.zip"
     File filtered_xlsx = "~{code}.filtered.xlsx"
   }
 }
