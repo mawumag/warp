@@ -16,6 +16,7 @@ version 1.0
 import "tasks/SplitVcf.wdl" as SplitVcf
 import "tasks/AnnotateVcf.wdl" as AnnotateVcf
 import "tasks/GeneratePedFile.wdl" as GeneratePedFile
+import "tasks/CalculateGenotypePosteriors.wdl" as CalculateGenotypePosteriors
 import "tasks/FilterVcf.wdl" as FilterVcf
 
 workflow AnnoFamily {
@@ -25,6 +26,8 @@ workflow AnnoFamily {
     Array[String]+ kinship
     Array[String]+ sex
     File input_vcf
+    Array[File] supporting_callsets
+    Array[File] supporting_callsets_indices
     File vep_archive
     String vep_data_dir = "vep_data"
     File cadd_snv
@@ -50,9 +53,26 @@ workflow AnnoFamily {
       input_vcf = input_vcf
   }
   
+  call GeneratePedFile.GeneratePedFile {
+    input:
+      family_id = family_id,
+      samples = samples,
+      kinship = kinship,
+      sex = sex
+  }
+
+  call CalculateGenotypePosteriors.CalculateGenotypePosteriors {
+    input :
+      input_vcf = SplitVcf.output_vcf,
+      ped_file = GeneratePedFile.ped_file,
+      supporting_callsets = supporting_callsets,
+      supporting_callsets_indices = supporting_callsets_indices,
+      output_vcf_basename = family_id
+  }
+
   call AnnotateVcf.EnsemblVepAnnotateVcf {
     input:
-      input_vcf = SplitVcf.output_vcf,
+      input_vcf = CalculateGenotypePosteriors.output_vcf,
       output_vcf_basename = family_id,
       cadd_snv = cadd_snv,
    	  cadd_snv_index = cadd_snv_index,
@@ -67,14 +87,6 @@ workflow AnnoFamily {
       connectome = connectome,
       PID_panel = PID_panel,
       PID_extra = PID_extra
-  }
-
-  call GeneratePedFile.GeneratePedFile {
-    input:
-      family_id = family_id,
-      samples = samples,
-      kinship = kinship,
-      sex = sex
   }
 
   call FilterVcf.FilterVcf {

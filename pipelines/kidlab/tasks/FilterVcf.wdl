@@ -41,7 +41,7 @@ task FilterVcf {
       exit 1
     fi
 
-    format='%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t%VQSLOD[\t%GT][\t%DP][\t%AD]\t%GeneticModels\t'
+    format='%CHROM\t%POS\t%ID\t%REF\t%ALT\t%FILTER\t%AS_VQSLOD[\t%GT][\t%DP][\t%AD]\t%GeneticModels\t'
     csq=$(bcftools +split-vep -l "$input" | cut -f 2 | tr '\n' '\t' | sed 's/\t$/\\n/' | sed 's/\t/\\t%/g' | sed 's/^/%/') 
     format+=$csq
 
@@ -59,114 +59,48 @@ task FilterVcf {
       fi
     done
 
-    bcftools view -i'GT['"$proband"']="alt"' "$input" | \
+    # Preliminary splitting and filtration
+
+    bcftools view -i'GT['"$proband"']="alt" && FMT/DP['"$proband"']>9' "$input" | \
     bcftools +split-vep -c - -dx | \
+    sed 's/ID=gnomAD_nhomalt,Number=.,Type=String/ID=gnomAD_nhomalt,Number=1,Type=Integer/' | \
     sed "s/^chrX/X/" | \
     genmod models -f <(echo -e "$ped") -k "Gene" - | \
-    sed "s/^X/chrX/" | \
-    bcftools query -H -f"$format" > "$code".anno.txt
+    sed "s/^X/chrX/" > temp.vcf
+
+    bcftools query -H -f"$format" temp.vcf > "$code".anno.txt
+
+    bcftools view -f PASS temp.vcf | \
+    bcftools view -i'AF<0.1' | \
+    bcftools +split-vep -x -s all:5_prime_utr+ | \
+    bcftools view -e'(CLIN_SIG~"benign" & CLIN_SIG!~"pathogenic") | gnomAD_nhomalt > 5' > temp2.vcf
+
+    bcftools view -e'MAX_AF>0.02 | INFO/PID="."' temp2.vcf | \
+    bcftools query -H -f"$format" > "$code".PID.txt
+
+    bcftools view -e'MAX_AF>0.02 | INFO/PIDg="."' temp2.vcf | \
+    bcftools query -H -f"$format" > "$code".PID_extra.txt
+
+    bcftools view -e'MAX_AF>0.02 | INFO/Connectome="." | INFO/PID="1" | INFO/PIDg="1" | (CADD_PHRED < 15 & MSC=".") | (CADD_PHRED < MSC) | (GT['"$proband"']="het" & Domino<0.5)' temp2.vcf | \
+    bcftools query -H -f"$format" > "$code".connectome.txt
+
+    bcftools view -e'MAX_AF>0.02 | INFO/Connectome!="." | INFO/PID="1" | INFO/PIDg="1" | (CADD_PHRED < 15 & MSC=".") | (CADD_PHRED < MSC) | (GT['"$proband"']="het" & Domino<0.5)' temp2.vcf | \
+    bcftools query -H -f"$format" > "$code".rest.txt
+
+    bcftools view -e'MAX_AF>0.02 | AD['"$proband"':1]<0.25 * FORMAT/DP['"$proband"'] | AD['"$proband"':1]>0.75 * FORMAT/DP['"$proband"']' temp2.vcf | \
+    bcftools view -i'Existing_variation="." & gnomAD="."' | \
+    bcftools query -H -f"$format" > "$code".private.txt
 
     if (( num >= 3 )); then
-      bcftools view -f PASS "$input" | \
-      sed 's/ID=gnomAD_nhomalt,Number=.,Type=String/ID=gnomAD_nhomalt,Number=1,Type=Integer/' | \
-      bcftools view -i'(GT['"$proband"']="alt" & AF<0.1)' | \
-      bcftools +split-vep -c - -dx -s all:5_prime_utr+ | \
-      bcftools view -e'(CLIN_SIG~"benign" & CLIN_SIG!~"pathogenic") | gnomAD_nhomalt > 5' | \
-      sed "s/^chrX/X/" | \
-      genmod models -f <(echo -e "$ped") -k "Gene" - | \
-      sed "s/^X/chrX/" | \
-      tee >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/PID="."' | \
-        bcftools query -H -f"$format" > "$code".PID.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/PIDg="."' | \
-        bcftools query -H -f"$format" > "$code".PID_extra.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/Connectome="." | INFO/PID="1" | INFO/PIDg="1" | (CADD_PHRED < 15 & MSC=".") | (CADD_PHRED < MSC) | (GT['"$proband"']="het" & Domino<0.5)' | \
-        bcftools query -H -f"$format" > "$code".connectome.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/Connectome!="." | INFO/PID="1" | INFO/PIDg="1" | (CADD_PHRED < 15 & MSC=".") | (CADD_PHRED < MSC) | (GT['"$proband"']="het" & Domino<0.5)' | \
-        bcftools query -H -f"$format" > "$code".rest.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | AD['"$proband"':1]<0.25 * FORMAT/DP['"$proband"'] | AD['"$proband"':1]>0.75 * FORMAT/DP['"$proband"']' | \
-        bcftools view -i'GT['"$father"']="ref" && GT['"$mother"']="ref"' | \
-        bcftools query -H -f"$format" > "$code".AD_denovo.txt \
-      ) \
-      >(\
-        bcftools view -i'(GeneticModels~"AR_comp")' | \
-        bcftools query -H -f"$format" > "$code".AR_comp.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.141' | \
-        bcftools view -i'(GeneticModels~"AR_hom")' | \
-        bcftools query -H -f"$format" > "$code".AR_hom.txt \
-      ) > \
-      >(\
-        bcftools view -i'Existing_variation="." & gnomAD="."' | \
-        bcftools query -H -f"$format" > "$code".private.txt \
-      )
-    elif (( num==1 )); then
-      bcftools view -f PASS "$input" | \
-      sed 's/ID=gnomAD_nhomalt,Number=.,Type=String/ID=gnomAD_nhomalt,Number=1,Type=Integer/' | \
-      bcftools view -i'(GT['"$proband"']="alt" & AF<0.1)' | \
-      bcftools +split-vep -c - -dx -s all:5_prime_utr+ | \
-      bcftools view -e'(CLIN_SIG~"benign" & CLIN_SIG!~"pathogenic") | gnomAD_nhomalt > 5' | \
-      sed "s/^chrX/X/" | \
-      genmod models -f <(echo -e "$ped") -k "Gene" - | \
-      sed "s/^X/chrX/" | \
-      tee >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/PID="."' | \
-        bcftools query -H -f"$format" > "$code".PID.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/PIDg="."' | \
-        bcftools query -H -f"$format" > "$code".PID_extra.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/Connectome!="." | INFO/PID="1" | INFO/PIDg="1" | (CADD_PHRED < 15 & MSC=".") | (CADD_PHRED < MSC) | (GT['"$proband"']="het" & Domino<0.5)' | \
-        bcftools query -H -f"$format" > "$code".rest.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/Connectome="." | INFO/PID="1" | INFO/PIDg="1"' | \
-        bcftools query -H -f"$format" > "$code".connectome.txt \
-      ) > \
-      >(\
-        bcftools view -i'Existing_variation="." & gnomAD="."' | \
-        bcftools query -H -f"$format" > "$code".private.txt \
-      )
-    elif (( num==2 )); then
-      bcftools view -f PASS "$input" | \
-      sed 's/ID=gnomAD_nhomalt,Number=.,Type=String/ID=gnomAD_nhomalt,Number=1,Type=Integer/' | \
-      bcftools view -i'(GT['"$proband"']="alt" & AF<0.1)' | \
-      bcftools +split-vep -c - -dx -s all:5_prime_utr+ | \
-      bcftools view -e'(CLIN_SIG~"benign" & CLIN_SIG!~"pathogenic") | gnomAD_nhomalt > 5' | \
-      sed "s/^chrX/X/" | \
-      genmod models -f <(echo -e "$ped") -k "Gene" - | \
-      sed "s/^X/chrX/" | \
-      tee >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/PID="."' | \
-        bcftools query -H -f"$format" > "$code".PID.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/PIDg="."' | \
-        bcftools query -H -f"$format" > "$code".PID_extra.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/Connectome!="." | INFO/PID="1" | INFO/PIDg="1" | (CADD_PHRED < 15 & MSC=".") | (CADD_PHRED < MSC) | (GT['"$proband"']="het" & Domino<0.5)' | \
-        bcftools query -H -f"$format" > "$code".rest.txt \
-      ) \
-      >(\
-        bcftools view -e'MAX_AF>0.02 | INFO/Connectome="." | INFO/PID="1" | INFO/PIDg="1"' | \
-        bcftools query -H -f"$format" > "$code".connectome.txt \
-      ) > \
-      >(\
-        bcftools view -i'Existing_variation="." & gnomAD="."' | \
-        bcftools query -H -f"$format" > "$code".private.txt \
-      )
+      bcftools view -i'GT['"$father"']="ref" && GT['"$mother"']="ref"' temp2.vcf | \
+      bcftools query -H -f"$format" > "$code".AD_denovo.txt
+
+      bcftools view -i'(GeneticModels~"AR_comp")' temp2.vcf | \
+      bcftools query -H -f"$format" > "$code".AR_comp.txt
+
+      bcftools view -e'MAX_AF>0.141' temp2.vcf | \
+      bcftools view -i'GT['"$proband"']="hom" && GT['"$father"']="het" && GT['"$mother"']="het"' | \
+      bcftools query -H -f"$format" > "$code".AR_hom.txt
     fi
 
     for filter in "$code".*; do
@@ -193,7 +127,7 @@ task FilterVcf {
 
       df.to_csv("$code.AR_comp.txt",index=False,sep='\t')
 
-    workbook = Workbook('$code.filtered.xlsx')
+    workbook = Workbook("$code.filtered.xlsx")
     workbook.use_zip64()
 
     for file in os.listdir('.'):
@@ -209,12 +143,12 @@ task FilterVcf {
   >>>
 
   runtime {
-  docker: "mawumag/anno-vep"
-  cpu: "1"
-  memory: "3 GiB"
+    docker: "mawumag/anno-vep"
+    cpu: "1"
+    memory: "3 GiB"
   }
   output {
-    File annotated_tsv = "~{code}.anno.txt.zip"
-    File filtered_xlsx = "~{code}.filtered.xlsx"
+    File annotated_tsv = code + ".anno.txt.zip"
+    File filtered_xlsx = code + ".filtered.xlsx"
   }
 }
