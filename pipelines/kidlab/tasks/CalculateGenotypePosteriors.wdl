@@ -18,11 +18,13 @@ task CalculateGenotypePosteriors {
     File input_vcf
     File ped_file
     Array[File] supporting_callsets
+    Array[File] supporting_callsets_indices
     String output_vcf_basename
   }
 
   command <<<
-    gatk --java-options "-Xms6G -Xmx7G" CalculateGenotypePosteriors \
+    gatk IndexFeatureFile -I ~{input_vcf}
+    gatk --java-options "-Xms3G -Xmx4G" CalculateGenotypePosteriors \
       -V ~{input_vcf} \
       --supporting-callsets ~{sep="," supporting_callsets} \
       --ped ~{ped_file} \
@@ -32,7 +34,7 @@ task CalculateGenotypePosteriors {
   runtime {
     docker: "us.gcr.io/broad-gatk/gatk:4.3.0.0"
     cpu: 1
-    memory: "8 GiB"
+    memory: "5 GiB"
   }
 
   output {
