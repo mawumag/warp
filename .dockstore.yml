@@ -5,6 +5,10 @@ workflows:
     subclass: WDL
     primaryDescriptorPath: /pipelines/kidlab/FastQsToGvcf.wdl
 
+  - name: GvcfToCohortVcf
+    subclass: WDL
+    primaryDescriptorPath: /pipelines/kidlab/GvcfToCohortVcf.wdl
+
   - name: AnnoFamily
     subclass: WDL
     primaryDescriptorPath: /pipelines/kidlab/AnnoFamily.wdl
