@@ -68,5 +68,6 @@ workflow FastQsToGvcf {
     File aligned_cram = EGSS.output_cram
     File aligned_cram_index = EGSS.output_cram_index
     File output_vcf = EGSS.output_vcf
+    File output_vcf_index = EGSS.output_vcf_index
   }
 }
