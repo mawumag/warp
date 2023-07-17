@@ -18,7 +18,7 @@ version 1.0
 import "GenerateSampleMap.wdl" as GenerateSampleMap
 import "../broad/dna_seq/germline/joint_genotyping/JointGenotyping.wdl" as JointGenotyping
 
-workflow FastQsToGvcf {
+workflow GvcfToCohortVcf {
   input {}
 
   call GenerateSampleMap.GenerateSampleMap {}
