@@ -21,9 +21,9 @@ import "../broad/dna_seq/germline/joint_genotyping/JointGenotyping.wdl" as Joint
 workflow GvcfToCohortVcf {
   input {}
 
-  call GenerateSampleMap.GenerateSampleMap {}
+  call GenerateSampleMap.GenerateSampleMap as GenerateSampleMap {}
 
-  call JointGenotyping.JointGenotyping {
+  call JointGenotyping.JointGenotyping as JointGenotyping {
     input:
       sample_name_map = GenerateSampleMap.sample_map
   }
