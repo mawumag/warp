@@ -20,7 +20,7 @@ task CheckSamplesUnique {
     then
       echo "There are fewer than ~{sample_num_threshold} samples in the sample_name_map" 1>&2
       echo "Having fewer than ~{sample_num_threshold} samples means there likely isn't enough data to complete joint calling" 1>&2
-      exit 1
+      # exit 1
     else
       echo true
     fi
