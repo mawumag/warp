@@ -104,8 +104,8 @@ task FilterVcf {
     fi
 
     for filter in "$code".*; do
-      sed -i '1 s/\[[0-9]\+\]//g' "$filter"
-      sed -i '1 s/^#[ ]?//' "$filter"
+      sed -i -r '1 s/\[[0-9]+\]//g' "$filter"
+      sed -i -r '1 s/^#[ ]?//' "$filter"
     done
 
     zip "$code".anno.txt.zip "$code".anno.txt && rm "$code".anno.txt
