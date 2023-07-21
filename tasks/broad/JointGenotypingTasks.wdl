@@ -4,7 +4,7 @@ version 1.0
 task CheckSamplesUnique {
   input {
     File sample_name_map
-    Int sample_num_threshold = 50
+    Int sample_num_threshold = 1
 
     Int machine_mem_mb = 1000
     Int disk_size_gb = 10
@@ -20,7 +20,7 @@ task CheckSamplesUnique {
     then
       echo "There are fewer than ~{sample_num_threshold} samples in the sample_name_map" 1>&2
       echo "Having fewer than ~{sample_num_threshold} samples means there likely isn't enough data to complete joint calling" 1>&2
-      # exit 1
+      exit 1
     else
       echo true
     fi
