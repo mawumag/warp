@@ -50,7 +50,7 @@ task FilterVcf {
     father=1
     mother=2
 
-    samples=($(bcftools query -l $input))
+    samples=($(bcftools query -l ~{input_vcf}))
 
     for i in $(seq 0 $((${#samples[@]}-1))); do
       if [[ ${samples[$i]} == "proband" ]]; then
