@@ -49,12 +49,14 @@ task FilterVcf {
     father=1
     mother=2
 
-    for i in $(seq 0 $((${#temp_output[@]}-1))); do
-      if [[ ${temp_output[$i]} == "proband" ]]; then
+    samples=($(bcftools query -l GC115416.vcf.gz))
+
+    for i in $(seq 0 $((${#samples[@]}-1))); do
+      if [[ ${samples[$i]} == "proband" ]]; then
         proband=$i
-      elif [[ ${temp_output[$i]} == "father" ]]; then
+      elif [[ ${samples[$i]} == "father" ]]; then
         father=$i
-      elif [[ ${temp_output[$i]} == "mother" ]]; then
+      elif [[ ${samples[$i]} == "mother" ]]; then
         mother=$i
       fi
     done
