@@ -22,6 +22,7 @@ task FilterVcf {
 
 
   command <<<
+    TMPDIR=/tmp
     input=~{input_vcf}
     code=~{code}
     sex=$(awk '{if ($1=="'"$code"'" && $6=="2") print $5}' ~{ped_file})
@@ -49,7 +50,7 @@ task FilterVcf {
     father=1
     mother=2
 
-    samples=($(bcftools query -l GC115416.vcf.gz))
+    samples=($(bcftools query -l $input))
 
     for i in $(seq 0 $((${#samples[@]}-1))); do
       if [[ ${samples[$i]} == "proband" ]]; then
