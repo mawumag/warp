@@ -19,8 +19,6 @@ workflow AnnoCohort {
   input {
     String cohort_id
     File input_vcf
-    Array[File] supporting_callsets
-    Array[File] supporting_callsets_indices
     File cadd_snv
     File cadd_snv_index
     File cadd_indel
