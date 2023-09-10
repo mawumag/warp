@@ -9,7 +9,7 @@ workflows:
     subclass: WDL
     primaryDescriptorPath: /pipelines/kidlab/GvcfToCohortVcf.wdl
 
-  - name: AnnoFamily
+  - name: FilterFamily
     subclass: WDL
     primaryDescriptorPath: /pipelines/kidlab/AnnoFamily.wdl
 

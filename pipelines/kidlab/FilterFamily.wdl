@@ -14,33 +14,19 @@ version 1.0
 ## licensing information pertaining to the included programs.
 
 import "tasks/SplitVcf.wdl" as SplitVcf
-import "tasks/AnnotateVcf.wdl" as AnnotateVcf
 import "tasks/GeneratePedFile.wdl" as GeneratePedFile
 import "tasks/CalculateGenotypePosteriors.wdl" as CalculateGenotypePosteriors
 import "tasks/FilterVcf.wdl" as FilterVcf
 
-workflow AnnoFamily {
+workflow FilterFamily {
   input {
     String family_id
     Array[String]+ samples
     Array[String]+ kinship
     Array[String]+ sex
-    File input_vcf
+    File annotated_cohort_vcf
     Array[File] supporting_callsets
     Array[File] supporting_callsets_indices
-    File cadd_snv
-    File cadd_snv_index
-    File cadd_indel
-    File cadd_indel_index
-    File gnomad_exomes
-    File gnomad_exomes_index
-    File gerp_scores
-    File domino
-    File msc
-    File gdi
-    File connectome
-    File PID_panel
-    File PID_extra
   }
 
   call SplitVcf.SplitVcf {
@@ -48,7 +34,7 @@ workflow AnnoFamily {
       family_id = family_id,
       samples = samples,
       kinship = kinship,
-      input_vcf = input_vcf
+      input_vcf = annotated_cohort_vcf
   }
   
   call GeneratePedFile.GeneratePedFile {
@@ -68,34 +54,15 @@ workflow AnnoFamily {
       output_vcf_basename = family_id
   }
 
-  call AnnotateVcf.EnsemblVepAnnotateVcf {
-    input:
-      input_vcf = CalculateGenotypePosteriors.output_vcf,
-      output_vcf_basename = family_id,
-      cadd_snv = cadd_snv,
-   	  cadd_snv_index = cadd_snv_index,
-      cadd_indel = cadd_indel,
-      cadd_indel_index = cadd_indel_index,
-      gnomad_exomes = gnomad_exomes,
-      gnomad_exomes_index = gnomad_exomes_index,
-      gerp_scores = gerp_scores,
-      domino = domino,
-      msc = msc,
-      gdi = gdi,
-      connectome = connectome,
-      PID_panel = PID_panel,
-      PID_extra = PID_extra
-  }
-
   call FilterVcf.FilterVcf {
     input:
-      input_vcf = EnsemblVepAnnotateVcf.output_vcf,
+      input_vcf = CalculateGenotypePosteriors.output_vcf,
       ped_file = GeneratePedFile.ped_file,
       code = family_id
   }
 
   output {
-    File annotated_vcf = EnsemblVepAnnotateVcf.output_vcf
+    File annotated_vcf = CalculateGenotypePosteriors.output_vcf
     File annotated_tsv = FilterVcf.annotated_tsv
     File filtered_xlsx = FilterVcf.filtered_xlsx
   }
