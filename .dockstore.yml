@@ -11,7 +11,7 @@ workflows:
 
   - name: FilterFamily
     subclass: WDL
-    primaryDescriptorPath: /pipelines/kidlab/AnnoFamily.wdl
+    primaryDescriptorPath: /pipelines/kidlab/FilterFamily.wdl
 
   - name: AnnoCohort
     subclass: WDL
