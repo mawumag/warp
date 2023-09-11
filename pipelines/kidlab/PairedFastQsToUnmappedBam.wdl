@@ -92,7 +92,7 @@ task PairedFastQsToUnmappedBAM {
     String gatk_path
 
     # Runtime parameters
-    Int addtional_disk_space_gb = 10
+    Int addtional_disk_space_gb = 20
     Int machine_mem_gb = 7
     Int preemptible_attempts = 3
     String docker
