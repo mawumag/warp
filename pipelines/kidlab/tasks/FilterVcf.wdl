@@ -99,7 +99,7 @@ task FilterVcf {
       bcftools view -e'MAX_AF>0.02 | AD['"$proband"':1]<0.25 * FORMAT/DP['"$proband"'] | AD['"$proband"':1]>0.75 * FORMAT/DP['"$proband"']' | \
       bcftools query -H -f"$format" > "$code".AD_denovo.txt
 
-      bcftools view -i'(GeneticModels~"AR_comp")' temp2.vcf | \
+      bcftools view -i'(GeneticModels~"AR_comp" & GeneticModels!~"AR_comp_dn")' temp2.vcf | \
       bcftools query -H -f"$format" > "$code".AR_comp.txt
 
       bcftools view -e'MAX_AF>0.141' temp2.vcf | \
