@@ -43,8 +43,10 @@ task FilterVcf {
     fi
 
     format='%CHROM\t%POS\t%ID\t%REF\t%ALT\t%FILTER\t%AS_VQSLOD[\t%GT][\t%DP][\t%AD]\t%GeneticModels\t'
+    format2='%CHROM\t%POS\t%ID\t%REF\t%ALT\t%FILTER\t%AS_VQSLOD[\t%GT][\t%DP][\t%AD]\t'
     csq=$(bcftools +split-vep -l "$input" | cut -f 2 | tr '\n' '\t' | sed 's/\t$/\\n/' | sed 's/\t/\\t%/g' | sed 's/^/%/') 
     format+=$csq
+    format2+=$csq
 
     proband=0
     father=1
@@ -66,17 +68,16 @@ task FilterVcf {
 
     bcftools view -i'GT['"$proband"']="alt" && FMT/DP['"$proband"']>9' "$input" | \
     bcftools +split-vep -c - -dx | \
-    sed 's/ID=gnomAD_nhomalt,Number=.,Type=String/ID=gnomAD_nhomalt,Number=1,Type=Integer/' | \
-    sed "s/^chrX/X/" | \
-    genmod models -f <(echo -e "$ped") -k "Gene" - | \
-    sed "s/^X/chrX/" > temp.vcf
+    sed 's/ID=gnomAD_nhomalt,Number=.,Type=String/ID=gnomAD_nhomalt,Number=1,Type=Integer/' > temp.vcf
 
-    bcftools query -H -f"$format" temp.vcf > "$code".anno.txt
+    bcftools query -H -f"$format2" temp.vcf > "$code".anno.txt
 
     bcftools view -f PASS temp.vcf | \
-    bcftools view -i'AF<0.1' | \
     bcftools +split-vep -x -s all:5_prime_utr+ | \
-    bcftools view -e'(CLIN_SIG~"benign" & CLIN_SIG!~"pathogenic") | gnomAD_nhomalt > 5' > temp2.vcf
+    bcftools view -e'(CLIN_SIG~"benign" & CLIN_SIG!~"pathogenic") | gnomAD_nhomalt > 5' | \
+    sed "s/^chrX/X/" | \
+    genmod models -f <(echo -e "$ped") -k "Gene" - | \
+    sed "s/^X/chrX/"  > temp2.vcf
 
     bcftools view -e'MAX_AF>0.02 | INFO/PID="."' temp2.vcf | \
     bcftools query -H -f"$format" > "$code".PID.txt
@@ -90,12 +91,12 @@ task FilterVcf {
     bcftools view -e'MAX_AF>0.02 | INFO/Connectome!="." | INFO/PID="1" | INFO/PIDg="1" | (CADD_PHRED < 15 & MSC=".") | (CADD_PHRED < MSC) | (GT['"$proband"']="het" & Domino<0.5)' temp2.vcf | \
     bcftools query -H -f"$format" > "$code".rest.txt
 
-    bcftools view -e'MAX_AF>0.02 | AD['"$proband"':1]<0.25 * FORMAT/DP['"$proband"'] | AD['"$proband"':1]>0.75 * FORMAT/DP['"$proband"']' temp2.vcf | \
-    bcftools view -i'Existing_variation="." & gnomAD="."' | \
+    bcftools view -i'Existing_variation="." & gnomAD="."' temp2.vcf | \
     bcftools query -H -f"$format" > "$code".private.txt
 
     if (( num >= 3 )); then
       bcftools view -i'GT['"$father"']="ref" && GT['"$mother"']="ref"' temp2.vcf | \
+      bcftools view -e'MAX_AF>0.02 | AD['"$proband"':1]<0.25 * FORMAT/DP['"$proband"'] | AD['"$proband"':1]>0.75 * FORMAT/DP['"$proband"']' | \
       bcftools query -H -f"$format" > "$code".AD_denovo.txt
 
       bcftools view -i'(GeneticModels~"AR_comp")' temp2.vcf | \
