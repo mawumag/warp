@@ -16,3 +16,7 @@ workflows:
   - name: AnnoCohort
     subclass: WDL
     primaryDescriptorPath: /pipelines/kidlab/AnnoCohort.wdl
+
+  - name: ExtractGeneFromCohort
+    subclass: WDL
+    primaryDescriptorPath: /pipelines/kidlab/ExtractGeneFromCohort.wdl
