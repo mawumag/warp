@@ -24,6 +24,8 @@ task EnsemblVepAnnotateVcf {
     File gnomad_exomes
     File gnomad_exomes_index
     File gerp_scores
+    File alphamissense
+    File alphamissense_index
     File domino
     File msc
     File gdi
@@ -46,6 +48,7 @@ task EnsemblVepAnnotateVcf {
       --everything \
       --plugin CADD,~{cadd_snv},~{cadd_indel} \
       --plugin Conservation,~{gerp_scores} \
+      --plugin AlphaMissense,file=~{alphamissense} \
       --custom ~{gnomad_exomes},gnomAD,vcf,exact,0,nhomalt \
       --force_overwrite \
       --fork ~{cpu} \

@@ -19,38 +19,12 @@ workflow AnnoCohort {
   input {
     String cohort_id
     File input_vcf
-    File cadd_snv
-    File cadd_snv_index
-    File cadd_indel
-    File cadd_indel_index
-    File gnomad_exomes
-    File gnomad_exomes_index
-    File gerp_scores
-    File domino
-    File msc
-    File gdi
-    File connectome
-    File PID_panel
-    File PID_extra
   }
 
   call AnnotateVcf.EnsemblVepAnnotateVcf {
     input:
       input_vcf = input_vcf,
       output_vcf_basename = cohort_id,
-      cadd_snv = cadd_snv,
-   	  cadd_snv_index = cadd_snv_index,
-      cadd_indel = cadd_indel,
-      cadd_indel_index = cadd_indel_index,
-      gnomad_exomes = gnomad_exomes,
-      gnomad_exomes_index = gnomad_exomes_index,
-      gerp_scores = gerp_scores,
-      domino = domino,
-      msc = msc,
-      gdi = gdi,
-      connectome = connectome,
-      PID_panel = PID_panel,
-      PID_extra = PID_extra
   }
 
   output {
