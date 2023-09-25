@@ -14,12 +14,52 @@ version 1.0
 ## licensing information pertaining to the included programs.
 
 workflow ExtractGeneFromCohort {
-  input {}
+  input {
+    Array[File]+ annotated_cohort_vcfs
+  }
 
-  call ExtractGene {}
+  call MergeVcfs {
+    input:
+      vcfs = annotated_cohort_vcfs
+  }
+
+  call ExtractGene {
+    input:
+      annotated_cohort_vcf = MergeVcfs.merged_vcf
+  }
 
   output {
     File gene_tsv = ExtractGene.gene_tsv
+  }
+}
+
+task MergeVcfs {
+  input {
+    Array[File]+ vcfs
+  }
+
+  Int number_vcfs = length(vcfs)
+
+  command <<<
+    vcfs="~{sep=" " vcfs}"
+    for vcf in $vcfs; do
+      bcftools index --tbi $vcf
+    done
+    if (( ~{number_vcfs} > 1 )); then
+      bcftools merge ~{sep=" " vcfs} -Oz -o merged.vcf.gz
+    else
+      mv ~{sep=" " vcfs} merged.vcf.gz
+    fi
+  >>>
+
+  runtime {
+    docker: "mawumag/anno-vep"
+    cpu: "1"
+    memory: "3 GiB"
+  }
+
+  output {
+    File merged_vcf = "merged.vcf.gz"
   }
 }
 
